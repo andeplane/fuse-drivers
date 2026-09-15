@@ -138,6 +138,26 @@ assert len(cubes) == 4, f'expected 4 item box frames, found {len(cubes)}'
 box = Image.new('RGBA', (128 * 4, 128), (0, 0, 0, 0))
 for i, c in enumerate(cubes): box.paste(fit(c, 128), (i * 128, 0))
 box.save(OUT / 'itembox.png')
+
+# Projectiles and effects from the elevated camera (assets/raw/items/projectiles-tilted.png), mapped into the existing
+# 8-frame strip order so FRAMES.projectiles stays valid: missile, exhaust, mine armed, mine unarmed, drone, shield, oil, emp.
+tilted = RAW / 'items' / 'projectiles-tilted.png'
+if tilted.exists():
+    raw = np.array(Image.open(tilted).convert('RGBA'))
+    raw[raw[..., 3] < 150] = 0
+    sheet = Image.fromarray(raw)
+    mask = raw[..., 3] > 0
+    cells = []
+    for (y0, y1) in [r for r in bands(mask, 1) if r[1] - r[0] > 30]:
+        cells += [sheet.crop((x0, y0, x1, y1)) for (x0, x1) in bands(mask[y0:y1], 0) if x1 - x0 > 30]
+    assert len(cells) == 8, f'expected 8 projectile sprites, found {len(cells)}'
+    missile, mine_on, mine_off, drone, shield, emp, smoke, _spark = cells
+    old_strip = Image.open(OUT / 'projectiles.png').convert('RGBA')
+    oil = old_strip.crop((6 * 128, 0, 7 * 128, 128))  # the drawn slick replaced this in game; keep the frame for order
+    strip = Image.new('RGBA', (128 * 8, 128), (0, 0, 0, 0))
+    for i, c in enumerate([missile, smoke, mine_on, mine_off, drone, shield, None, emp]):
+        strip.paste(oil if c is None else fit(c, 128), (i * 128, 0))
+    strip.save(OUT / 'projectiles.png')
 # Stadium decor (assets/raw/tiles/README.md): drum, tyres, pipe, elbow, tank, cone, hay, sign, floodlight, puddle, clump, grass, crowd x3.
 print('decor sprites:', split_sheet('decor', 'tiles', 128))
 
