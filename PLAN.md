@@ -40,7 +40,7 @@ Mirror and reverse variants triple the count at build time.
 
 ## Art
 
-Neon-pixel hybrid from the mockup: dark industrial ground, green toxic pools, red warning lights, cyan/pink/lime/violet/orange trucks with matching nitro glow, chunky pixel HUD. Strict overhead camera; sprites must read from a couch. Pipeline: concept screenshot per track with the image tool first, then a 32 px tileset, five palette-swapped truck sprites, item icons, particle sheets, Press Start 2P for the HUD. Truck sprites pre-rendered in 16 directions, snapped by the renderer.
+Chosen style: **arcade 1989**, `docs/concepts/style-02-arcade-1989.png`. Authentic late-80s arcade pixel art, chunky 16-color palette, thick black outlines, brown stadium dirt, red-and-white lane barriers, a crowd and sponsor banners around the edge, bold bitmap HUD. Strict overhead camera; sprites must read from a couch. `assets/raw/STYLE.md` is the brief every generated asset follows; raw generations live in `assets/raw/`, game-ready cuts in `public/assets/`. 32 px tileset, five palette-swapped truck sheets in 16 directions, item icons, effect sheets, Press Start 2P for HUD text.
 
 ## Milestones
 
