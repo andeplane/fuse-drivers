@@ -37,6 +37,7 @@ Super Off Road used eight-way absolute steering on a joystick. A phone thumb, an
 | Oil | 1.0 | heading noise ±20° for 1 s, turn rate × 0.5 (bounded, seeded) |
 | Boost pad | 1.5 for 0.5 s | directional; wrong way gives nothing |
 | Toxic | 0.6 | −1 armor on entry, then every 15 ticks inside; never below 1; timer resets on exit |
+| Moguls | 0.85 | each bump tile is a 4-tick hop: no steering while airborne, no landing penalty |
 | Ramp | — | airborne trigger |
 
 - **Spin-out** (from damage): 0.8 s, no input, speed × 0.3, heading unchanged in the sim; the sprite tweens a full turn.

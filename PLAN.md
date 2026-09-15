@@ -30,8 +30,10 @@ All rules and numbers live in the ADRs, and once `src/shared/config.ts` exists, 
 
 ## Tracks
 
-1. **Refinery Oval** (M0, the mockup): oval with a chicane, one ramp on the back straight, toxic pools inside two corners, boost pad at the start. Dirt, toxic, boost, ramp, walls only.
-2. **Sidewinder** (M2): figure-eight with a bridge crossing, mud in the lower loop, oil at the crossing exit.
+Super Off Road's tracks fill the screen: a serpentine that folds back on itself with barriers between adjacent lanes, 8–12 corners including two or three hairpins, mogul rows, a jump, a puddle. Track width about 90 u (three trucks). A lap is 12–15 s because the trucks are always turning, not because the track is short. Every Fuse Drivers track follows that rule; an oval is not a track.
+
+1. **Refinery** (M0): ten corners in a folded S, two hairpins around toxic pools, a mogul row on the back stretch, one ramp, boost pad at the start. Dirt, toxic, moguls, boost, ramp, walls only.
+2. **Sidewinder** (M2): figure-eight with a bridge crossing, three hairpins, mud in the lower loop, oil at the crossing exit.
 3. **Sump** (M2): tight technical layout, water crossing, two ramps in sequence, a narrow tarmac section where drift matters.
 
 Mirror and reverse variants triple the count at build time.
