@@ -135,7 +135,7 @@ export class RaceScene extends Phaser.Scene {
       const t = this.runner.state.trucks[i];
       return this.add.sprite(t.x, t.y, `truck-${c}`, 0).setScale(TRUCK_SCALE).setDepth(10);
     });
-    this.shields = this.sprites.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 1.6).setAlpha(0.55).setDepth(11).setVisible(false));
+    this.shields = this.sprites.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 2.2).setAlpha(0.55).setDepth(11).setVisible(false));
     this.boxes = this.track.items.map((p) => this.add.sprite(p.x, p.y, 'itembox', 0).setScale(SPRITE_SCALE).setDepth(4).play('box-pulse'));
     this.marks = this.add.graphics().setDepth(12);
     // Dropped oil uses the same glossy slick as the track's oil patches instead of the flat top-down splat.
@@ -597,7 +597,8 @@ export class RaceScene extends Phaser.Scene {
       return undefined;
     };
     // Tanks and lights in the stands; tyre stacks and drums also on off-lane dirt, clear of the barriers.
-    for (const [frame, size, n, cells] of [[DECOR.tank, 70, 4, band], [DECOR.light, 40, 4, band], [DECOR.sign, 64, 2, band], [DECOR.tyres, 40, 10, out], [DECOR.drum, 32, 8, out]] as const) {
+    // Tanks, lights and signs were soft upscaled sprites that read as blobs next to the generated stadium frame; keep tyres and drums.
+    for (const [frame, size, n, cells] of [[DECOR.tyres, 40, 10, out], [DECOR.drum, 32, 8, out]] as const) {
       for (let i = 0; i < n; i++) { const at = place(size, size, 0, cells); if (at) sprite(ctx, frame, at.x + size / 2, at.y + size / 2, size); }
     }
     tex.refresh();
