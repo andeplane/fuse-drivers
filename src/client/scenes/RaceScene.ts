@@ -68,7 +68,9 @@ export class RaceScene extends Phaser.Scene {
   oils = new Map<number, Phaser.GameObjects.Image>();
   drones = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
-  shadows: Phaser.GameObjects.Sprite[] = [];
+  /** Soft ground shadows under every truck: one layer on the ground, one above the bridge deck. */
+  shadowsLow!: Phaser.GameObjects.Graphics;
+  shadowsHigh!: Phaser.GameObjects.Graphics;
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   /** Recent sim positions per missile, for the dotted trail. */
   trails = new Map<number, { x: number; y: number }[]>();
@@ -124,7 +126,8 @@ export class RaceScene extends Phaser.Scene {
     this.cameras.main.setViewport((config.screen.width - worldW * zoom) / 2, config.screen.height - worldH * zoom, worldW * zoom, worldH * zoom).setZoom(zoom).centerOn(worldW / 2, worldH / 2);
     this.trails.clear();
     this.lastTick = -1;
-    this.shadows = TRUCK_COLORS.map((c) => this.add.sprite(0, 0, `truck-${c}`, 0).setScale(TRUCK_SCALE).setTintFill(0x000000).setAlpha(0.4).setDepth(9).setVisible(false));
+    this.shadowsLow = this.add.graphics().setDepth(9);
+    this.shadowsHigh = this.add.graphics().setDepth(14);
     this.dust = this.add.particles(0, 0, 'dust', {
       frame: [...FRAMES.dust], lifespan: 450, speed: { min: 5, max: 30 }, scale: { start: SPRITE_SCALE * 0.5, end: SPRITE_SCALE * 0.9 }, alpha: { start: 0.7, end: 0 }, emitting: false,
     }).setDepth(8);
@@ -505,20 +508,6 @@ export class RaceScene extends Phaser.Scene {
       }
       return undefined;
     };
-    // Banners first; the HUD strip sits above the world now.
-    for (const [text, bg, fg] of SPONSORS) {
-      const bw = 84, bh = 22, at = place(bw, bh, 0, band);
-      if (!at) continue;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(at.x, at.y, bw, bh);
-      ctx.fillStyle = bg;
-      ctx.fillRect(at.x + 3, at.y + 3, bw - 6, bh - 6);
-      ctx.fillStyle = fg;
-      ctx.font = 'italic bold 13px Impact, "Arial Black", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, at.x + bw / 2, at.y + bh / 2 + 1, bw - 12);
-    }
     // Tanks and lights in the stands; tyre stacks and drums also on off-lane dirt, clear of the barriers.
     for (const [frame, size, n, cells] of [[DECOR.tank, 70, 4, band], [DECOR.light, 40, 4, band], [DECOR.sign, 64, 2, band], [DECOR.tyres, 40, 10, out], [DECOR.drum, 32, 8, out]] as const) {
       for (let i = 0; i < n; i++) { const at = place(size, size, 0, cells); if (at) sprite(ctx, frame, at.x + size / 2, at.y + size / 2, size); }
@@ -554,13 +543,18 @@ export class RaceScene extends Phaser.Scene {
     }
     const poses = renderSnapshot(this.runner.previous, state, this.runner.alpha);
     this.marks.clear();
+    this.shadowsLow.clear();
+    this.shadowsHigh.clear();
     // Cosmetic effects sample once per sim tick so their density does not depend on the display frame rate.
     const newTick = state.tick !== this.lastTick;
     this.lastTick = state.tick;
     poses.forEach((p, i) => {
       const t = state.trucks[i];
       const air = state.tick < t.airborneUntilTick;
-      this.shadows[i].setPosition(p.x + 10, p.y + 14).setFrame(headingFrame(p.heading)).setVisible(air && !t.respawnAtTick).setDepth(t.onBridge ? 14 : 9);
+      if (!t.respawnAtTick) {
+        // Grounds the tilted sprite: an ellipse under the wheels, wider and fainter while airborne.
+        (t.onBridge ? this.shadowsHigh : this.shadowsLow).fillStyle(0x000000, air ? 0.22 : 0.38).fillEllipse(p.x + (air ? 6 : 2), p.y + 16, air ? 54 : 46, air ? 20 : 16);
+      }
       if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
       this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
