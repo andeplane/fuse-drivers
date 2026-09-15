@@ -14,6 +14,9 @@ export class MenuScene extends Phaser.Scene {
   create(data: { tracks: Record<string, Track> }) {
     const { width, height } = config.screen;
     const touch = window.matchMedia('(pointer: coarse)').matches;
+    // The stadium crowd behind a framed panel, so the first screen already looks like the arena.
+    if (this.textures.exists('grandstand')) this.add.tileSprite(0, 0, width, height, 'grandstand').setOrigin(0).setTileScale(0.8).setAlpha(0.45);
+    this.add.rectangle(width / 2, height * 0.5, width * 0.84, height * 0.86, 0x0c0804, 0.82).setStrokeStyle(6, 0xffd23f);
     this.add.image(width / 2, height * 0.24, 'logo', 0).setScale(0.9);
     this.add.text(width / 2, height * 0.46, touch ? 'TAP THE MIDDLE TO RACE     TAP THE SIDES TO PICK A TRACK' : 'SPACE: SINGLE RACE     ENTER: 5-RACE SERIES WITH SHOP', { ...FONT, fontSize: '36px' }).setOrigin(0.5);
     const names = Object.keys(data.tracks).sort();
@@ -25,7 +28,7 @@ export class MenuScene extends Phaser.Scene {
     const next = () => { pick = (pick + 1) % names.length; show(); };
     this.input.keyboard!.on('keydown-LEFT', prev);
     this.input.keyboard!.on('keydown-RIGHT', next);
-    if (!touch) this.add.text(width / 2, height * 0.62, 'ARROWS / A D steer  ·  S brake  ·  SHIFT nitro  ·  SPACE item  ·  hold DOWN + SPACE to fire backwards  ·  M mute', { ...FONT, fontSize: '22px' }).setOrigin(0.5);
+    if (!touch) this.add.text(width / 2, height * 0.62, 'ARROWS steer · S brake · SHIFT nitro · SPACE item · DOWN+SPACE backwards · M mute', { ...FONT, fontSize: '22px' }).setOrigin(0.5);
     const single = () => this.scene.start('Race', { series: createSeries([names[pick]], 5, Date.now() >>> 0, 1), tracks: data.tracks });
     const series = () => this.scene.start('Race', { series: createSeries(names, 5, Date.now() >>> 0, 5), tracks: data.tracks });
     // Ignore auto-repeat so a key still held from the previous scene does not skip this one.
