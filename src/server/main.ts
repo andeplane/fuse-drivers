@@ -1,6 +1,6 @@
 /**
  * Party server (ADR 008): one Node process is the authority. Serves the built client from dist/, accepts
- * WebSockets on /ws, runs each room's race runner on a timer and streams 15 Hz snapshots to displays.
+ * WebSockets on /ws, runs each room's race runner on a timer and streams 30 Hz snapshots to displays.
  * Usage: `npm start` (builds, then serves) or `npm run server` next to `npm run dev` (Vite proxies /ws).
  */
 import { createReadStream, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -120,7 +120,8 @@ setInterval(() => {
     if (p.phase === 'race' && p.runner) {
       const { state, events } = p.runner.advance(elapsed, seatInputs(p.room, clock(p)));
       p.events.push(...events);
-      if (state.tick - p.lastSentTick >= 2) {
+      // Every tick (30 Hz): at 15 Hz a phone press waited up to a tick for the next snapshot and the TV drew two ticks behind.
+      if (state.tick - p.lastSentTick >= 1) {
         toHosts(p, { t: 'snap', state, events: p.events });
         p.events = [];
         p.lastSentTick = state.tick;

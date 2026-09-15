@@ -6,8 +6,8 @@ export interface RemoteRunner extends RaceRunner {
   push(state: RaceState, events: RaceEvent[]): void;
 }
 
-/** Server snapshots arrive every second tick (ADR 008); render one interval behind by lerping the last two. */
-const INTERVAL_MS = 2 * TICK_MS;
+/** Server snapshots arrive every tick (ADR 008); render one interval behind by lerping the last two. */
+const INTERVAL_MS = TICK_MS;
 
 export function createRemoteRunner(first: RaceState): RemoteRunner {
   let previous = first, state = first, since = 0;
