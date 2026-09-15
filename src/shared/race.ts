@@ -242,6 +242,8 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
     return { ...resolved, wallTicks: touching ? prev[i].wallTicks + 1 : 0 };
   });
   trucks = resolveContacts(trucks);
+  // Contacts can push a truck into a wall; settle position again without a second speed penalty.
+  trucks = trucks.map((t, i) => (parked(t) ? t : { ...resolveWalls(t, prev[i], track, true)[0], speed: t.speed }));
 
   // Step 4: item use on a press edge, then projectiles, then hits in launch order (ADR 005).
   let { missiles, mines, nextId } = state;
