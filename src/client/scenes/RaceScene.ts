@@ -119,12 +119,16 @@ export class RaceScene extends Phaser.Scene {
     const map = this.make.tilemap({ data: rows, tileWidth: TILE_PX, tileHeight: TILE_PX });
     const tiles = map.addTilesetImage('surfaces', 'surfaces', TILE_PX, TILE_PX)!;
     map.createLayer(0, tiles, 0, 0)!.setScale(tile / TILE_PX);
+    this.drawGround();
 
     const g = this.make.graphics({}, false);
     const barriers = this.track.walls.filter((w) => !w.deck);
-    // Black outline pass first so neighbouring barriers never paint over each other's stripes.
-    strokeWalls(g, barriers, 18, () => 0x000000);
-    strokeWalls(g, barriers, 11, (d) => (Math.floor(d / 14) % 2 ? 0xf2f2f2 : 0xd62828));
+    // Chunky blocks: black outline, a shaded side, a bright top face, black seams between blocks.
+    // 26 u wide stays inside the 2 * truck-radius band the walls already collide with.
+    const block = 18, seam = (d: number) => d % block < 2;
+    strokeWalls(g, barriers, 26, () => 0x000000);
+    strokeWalls(g, barriers, 20, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0x8c8c96 : 0x8a1616));
+    strokeWalls(g, barriers, 12, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xf6f6f6 : 0xe23232));
     const finish = this.track.checkpoints[this.track.checkpoints.length - 1];
     const fl = Math.hypot(finish.b.x - finish.a.x, finish.b.y - finish.a.y), fx = (finish.b.x - finish.a.x) / fl, fy = (finish.b.y - finish.a.y) / fl;
     for (let d = 0, i = 0; d < fl; d += 8, i++) {
@@ -165,6 +169,159 @@ export class RaceScene extends Phaser.Scene {
       gfx.generateTexture(key, w, h).destroy();
       this.add.image(0, 0, key).setOrigin(0).setDepth(depth);
     }
+  }
+
+  /**
+   * Bake the floor detail and the stadium into one canvas under everything else: tyre grooves and grit on
+   * plain dirt, then crowd, fence, banners and industrial props in the area outside the outer barrier.
+   */
+  private drawGround() {
+    const { tile } = config;
+    const { cols, rows, surface, walls, waypoints, name } = this.track;
+    const w = cols * tile, h = rows * tile;
+    if (this.textures.exists('track-ground')) this.textures.remove('track-ground');
+    const tex = this.textures.createCanvas('track-ground', w, h)!;
+    const ctx = tex.getContext();
+    const rand = rng([...name].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7));
+
+    // Floor detail, clipped to dirt tiles so hazards keep their own look.
+    ctx.save();
+    ctx.beginPath();
+    surface.forEach((s, i) => { if (!s || s === 'dirt') ctx.rect((i % cols) * tile, Math.floor(i / cols) * tile, tile, tile); });
+    ctx.clip();
+    for (let i = 0; i < 70; i++) {
+      ctx.fillStyle = i % 3 ? 'rgba(60,30,10,0.12)' : 'rgba(240,190,120,0.08)';
+      ctx.beginPath();
+      ctx.ellipse(rand() * w, rand() * h, 20 + rand() * 50, 12 + rand() * 30, rand() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < (w * h) / 60; i++) {
+      ctx.fillStyle = rand() < 0.6 ? 'rgba(50,25,8,0.35)' : 'rgba(235,185,120,0.3)';
+      ctx.fillRect(Math.floor(rand() * w / 2) * 2, Math.floor(rand() * h / 2) * 2, 2, 2);
+    }
+    // Tyre grooves: parallel strokes along the racing line.
+    const closed = Math.hypot(waypoints[0].x - waypoints[waypoints.length - 1].x, waypoints[0].y - waypoints[waypoints.length - 1].y) < 200;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2;
+    for (let k = -3; k <= 3; k++) {
+      ctx.strokeStyle = k % 2 ? 'rgba(45,22,6,0.22)' : 'rgba(230,180,110,0.12)';
+      ctx.beginPath();
+      waypoints.forEach((p, i) => {
+        const a = waypoints[closed ? (i - 1 + waypoints.length) % waypoints.length : Math.max(0, i - 1)];
+        const b = waypoints[closed ? (i + 1) % waypoints.length : Math.min(waypoints.length - 1, i + 1)];
+        const l = Math.hypot(b.x - a.x, b.y - a.y) || 1, off = k * 9 + Math.sin(i * 1.7 + k) * 2;
+        const x = p.x - ((b.y - a.y) / l) * off, y = p.y + ((b.x - a.x) / l) * off;
+        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      });
+      if (closed) ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Outside = cells reachable from the world border without coming within 30 u of any wall.
+    const G = 4, gw = Math.ceil(w / G), gh = Math.ceil(h / G), R = Math.ceil(30 / G);
+    const blocked = new Uint8Array(gw * gh), out = new Uint8Array(gw * gh);
+    for (const s of walls) {
+      const len = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y);
+      for (let d = 0; d <= len; d += G) {
+        const cx = Math.floor(lerp(s.a.x, s.b.x, d / (len || 1)) / G), cy = Math.floor(lerp(s.a.y, s.b.y, d / (len || 1)) / G);
+        for (let y = Math.max(0, cy - R); y <= Math.min(gh - 1, cy + R); y++) {
+          for (let x = Math.max(0, cx - R); x <= Math.min(gw - 1, cx + R); x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= R * R) blocked[y * gw + x] = 1;
+        }
+      }
+    }
+    const stack: number[] = [];
+    const push = (i: number) => { if (!blocked[i] && !out[i]) { out[i] = 1; stack.push(i); } };
+    for (let x = 0; x < gw; x++) { push(x); push((gh - 1) * gw + x); }
+    for (let y = 0; y < gh; y++) { push(y * gw); push(y * gw + gw - 1); }
+    let count = 0;
+    while (stack.length) {
+      const i = stack.pop()!, x = i % gw;
+      count++;
+      if (x > 0) push(i - 1);
+      if (x < gw - 1) push(i + 1);
+      if (i >= gw) push(i - gw);
+      if (i < gw * (gh - 1)) push(i + gw);
+    }
+    // A gap in the outer barrier would flood the lanes; draw no stadium rather than cover the track.
+    if (count > out.length / 2) { tex.refresh(); this.add.image(0, 0, 'track-ground').setOrigin(0).setDepth(1); return; }
+
+    // Stands only along the world edges; open infield between lane loops stays dirt.
+    const band = out.map((v, i) => (v && Math.min(i % gw, gw - 1 - (i % gw), Math.floor(i / gw), gh - 1 - Math.floor(i / gw)) * G < 150 ? 1 : 0));
+    const mask = (rgb: string) => {
+      const c = document.createElement('canvas');
+      c.width = gw; c.height = gh;
+      const m = c.getContext('2d')!;
+      m.fillStyle = rgb;
+      band.forEach((v, i) => { if (v) m.fillRect(i % gw, Math.floor(i / gw), 1, 1); });
+      return c;
+    };
+    const decor = this.textures.get('decor');
+    const sprite = (c: CanvasRenderingContext2D, i: number, x: number, y: number, size: number, angle = 0) => {
+      const f = decor.get(i);
+      c.save();
+      c.translate(x, y);
+      c.rotate(angle);
+      c.drawImage(f.source.image as CanvasImageSource, f.cutX, f.cutY, f.cutWidth, f.cutHeight, -size / 2, -size / 2, size, size);
+      c.restore();
+    };
+
+    // Grandstand: crowd tiles with steel pipes down both side edges, cut to the outside area.
+    const stands = document.createElement('canvas');
+    stands.width = w; stands.height = h;
+    const sc = stands.getContext('2d')!;
+    sc.fillStyle = '#2e2e34';
+    sc.fillRect(0, 0, w, h);
+    for (let y = 0, r = 0; y < h + 36; y += 34, r++) {
+      for (let x = r % 2 ? 0 : 18; x < w + 36; x += 36) sprite(sc, DECOR.crowd[Math.floor(rand() * 3)], x, y, 46);
+    }
+    for (let y = 0; y < h + 40; y += 40) { sprite(sc, DECOR.pipe, 14, y, 64, Math.PI / 2); sprite(sc, DECOR.pipe, w - 14, y, 64, Math.PI / 2); }
+    sc.globalCompositeOperation = 'destination-in';
+    sc.imageSmoothingEnabled = false;
+    sc.drawImage(mask('#000'), 0, 0, w, h);
+
+    // Fence: black outline then a steel rail around the stands, both from the upscaled mask.
+    ctx.imageSmoothingEnabled = false;
+    for (const [img, o] of [[mask('#000'), 7], [mask('#a4a6ae'), 4]] as const) {
+      for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, o], [-o, o], [o, -o]]) ctx.drawImage(img, dx, dy, w, h);
+    }
+    ctx.drawImage(stands, 0, 0);
+
+    // Props where they fit entirely inside the given cells, never overlapping each other.
+    const used = new Uint8Array(out.length);
+    const place = (pw: number, ph: number, minY: number, cells: Uint8Array) => {
+      for (let tries = 0; tries < 300; tries++) {
+        const x = Math.floor(rand() * (w - pw)), y = minY + Math.floor(rand() * (h - ph - minY));
+        let ok = true;
+        for (let gy = Math.floor(y / G); ok && gy <= Math.floor((y + ph) / G); gy++) {
+          for (let gx = Math.floor(x / G); gx <= Math.floor((x + pw) / G); gx++) if (!cells[gy * gw + gx] || used[gy * gw + gx]) { ok = false; break; }
+        }
+        if (!ok) continue;
+        for (let gy = Math.floor(y / G); gy <= Math.floor((y + ph) / G); gy++) used.fill(1, gy * gw + Math.floor(x / G), gy * gw + Math.floor((x + pw) / G) + 1);
+        return { x, y };
+      }
+      return undefined;
+    };
+    // Banners first, below the top HUD strip so they stay visible.
+    for (const [text, bg, fg] of SPONSORS) {
+      const bw = 120, bh = 30, at = place(bw, bh, 74, band);
+      if (!at) continue;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(at.x, at.y, bw, bh);
+      ctx.fillStyle = bg;
+      ctx.fillRect(at.x + 3, at.y + 3, bw - 6, bh - 6);
+      ctx.fillStyle = fg;
+      ctx.font = 'italic bold 18px Impact, "Arial Black", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, at.x + bw / 2, at.y + bh / 2 + 1, bw - 12);
+    }
+    // Tanks and lights in the stands; tyre stacks and drums also on off-lane dirt, clear of the barriers.
+    for (const [frame, size, n, cells] of [[DECOR.tank, 70, 4, band], [DECOR.light, 40, 4, band], [DECOR.sign, 64, 2, band], [DECOR.tyres, 40, 10, out], [DECOR.drum, 32, 8, out]] as const) {
+      for (let i = 0; i < n; i++) { const at = place(size, size, 0, cells); if (at) sprite(ctx, frame, at.x + size / 2, at.y + size / 2, size); }
+    }
+    tex.refresh();
+    this.add.image(0, 0, 'track-ground').setOrigin(0).setDepth(1);
   }
 
   update(_time: number, delta: number) {
@@ -241,4 +398,14 @@ export class RaceScene extends Phaser.Scene {
       this.marks.beginPath().moveTo(x + sx * r, y + sy * (r - l)).lineTo(x + sx * r, y + sy * r).lineTo(x + sx * (r - l), y + sy * r).strokePath();
     }
   }
+}
+
+/** Frames in the decor strip cut by scripts/build-assets.py. */
+const DECOR = { drum: 0, tyres: 1, pipe: 2, elbow: 3, tank: 4, sign: 7, light: 8, crowd: [12, 13, 14] } as const;
+/** Made-up sponsors: text, panel colour, text colour. */
+const SPONSORS = [['MR.GRIP', '#d62828', '#ffffff'], ['FUSE OIL', '#ffe600', '#111111'], ['TURBO', '#1f5fd6', '#ffffff'], ['NITRO-X', '#ffffff', '#d62828'], ['DIRT KING', '#111111', '#ffe600']] as const;
+
+/** Tiny seeded LCG so a track's decor lays out the same way every race. Presentation only. */
+function rng(seed: number) {
+  return () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
 }
