@@ -4,6 +4,7 @@ import { MAX_SEATS } from '../../shared/room.ts';
 import { leaveParty, type PartyLink } from '../net/party.ts';
 import { FONT, TRUCK_COLORS } from './BootScene.ts';
 import { COLOR_HEX } from './ShopScene.ts';
+import { backdrop } from './backdrop.ts';
 
 /** Party on a TV (M3): room code, QR code, seats filling as phones join; the host keyboard starts races. */
 export class LobbyScene extends Phaser.Scene {
@@ -12,7 +13,7 @@ export class LobbyScene extends Phaser.Scene {
   create(data: { link: PartyLink }) {
     const link = data.link;
     const { width, height } = config.screen;
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55);
+    backdrop(this);
     this.add.text(width / 2, 60, 'PARTY', { ...FONT, fontSize: '72px', color: '#ffd23f' }).setOrigin(0.5);
     const code = this.add.text(420, 190, '', { ...FONT, fontSize: '110px', color: '#9cff2e' }).setOrigin(0.5);
     const url = this.add.text(420, 280, '', { ...FONT, fontSize: '22px' }).setOrigin(0.5);

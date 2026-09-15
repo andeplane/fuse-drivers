@@ -4,6 +4,7 @@ import { createSeries } from '../../shared/series.ts';
 import type { Track } from '../../shared/track.ts';
 import { partyLink } from '../net/party.ts';
 import { FONT } from './BootScene.ts';
+import { backdrop } from './backdrop.ts';
 
 /** Seconds without input on the menu before the attract demo starts. */
 const ATTRACT_AFTER_MS = 20_000;
@@ -14,9 +15,7 @@ export class MenuScene extends Phaser.Scene {
   create(data: { tracks: Record<string, Track> }) {
     const { width, height } = config.screen;
     const touch = window.matchMedia('(pointer: coarse)').matches;
-    // The stadium crowd behind a framed panel, so the first screen already looks like the arena.
-    if (this.textures.exists('grandstand')) this.add.tileSprite(0, 0, width, height, 'grandstand').setOrigin(0).setTileScale(0.8).setAlpha(0.45);
-    this.add.rectangle(width / 2, height * 0.5, width * 0.84, height * 0.86, 0x0c0804, 0.82).setStrokeStyle(6, 0xffd23f);
+    backdrop(this);
     this.add.image(width / 2, height * 0.24, 'logo', 0).setScale(0.9);
     this.add.text(width / 2, height * 0.46, touch ? 'TAP THE MIDDLE TO RACE     TAP THE SIDES TO PICK A TRACK' : 'SPACE: SINGLE RACE     ENTER: 5-RACE SERIES WITH SHOP', { ...FONT, fontSize: '36px' }).setOrigin(0.5);
     const names = Object.keys(data.tracks).sort();

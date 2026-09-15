@@ -4,6 +4,7 @@ import { standings, type Series } from '../../shared/series.ts';
 import type { PartyLink, SeatView } from '../net/party.ts';
 import { FONT, TRUCK_COLORS } from './BootScene.ts';
 import { COLOR_HEX } from './ShopScene.ts';
+import { backdrop } from './backdrop.ts';
 
 interface ShopMessage { series: Series; until: number; names: Record<number, string>; seats: SeatView[] }
 
@@ -14,7 +15,7 @@ export class PartyShopScene extends Phaser.Scene {
   create(data: { link: PartyLink; shop: ShopMessage }) {
     const { width, height } = config.screen;
     let shop = data.shop;
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6);
+    backdrop(this);
     this.add.text(width / 2, 70, 'SHOP  ·  BUY ON YOUR PHONE', { ...FONT, fontSize: '56px', color: '#ffd23f' }).setOrigin(0.5);
     const next = this.add.text(width / 2, 150, '', { ...FONT, fontSize: '32px' }).setOrigin(0.5);
     const rows = Array.from({ length: shop.series.drivers.length }, (_, i) => this.add.text(width / 2, 240 + i * 80, '', { ...FONT, fontSize: '40px' }).setOrigin(0.5));

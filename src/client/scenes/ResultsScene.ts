@@ -6,6 +6,7 @@ import { currentParty, type PartyData } from '../net/party.ts';
 import { FONT, TRUCK_COLORS } from './BootScene.ts';
 import type { SeriesData } from './RaceScene.ts';
 import { COLOR_HEX } from './ShopScene.ts';
+import { backdrop } from './backdrop.ts';
 
 export class ResultsScene extends Phaser.Scene {
   constructor() { super('Results'); }
@@ -13,7 +14,7 @@ export class ResultsScene extends Phaser.Scene {
   create(data: SeriesData & { state: RaceState; party?: PartyData }) {
     const { width, height } = config.screen;
     const nameOf = (slot: number) => (data.party ? data.party.names[slot] ?? `BOT ${slot}` : slot === 0 ? 'YOU' : `BOT ${slot}`);
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6);
+    backdrop(this);
     const last = data.series.raceIndex >= data.series.tracks.length;
     this.add.text(width / 2, 90, last && data.series.tracks.length > 1 ? 'SERIES OVER' : 'RESULTS', { ...FONT, fontSize: '80px', color: '#ffd23f' }).setOrigin(0.5);
     data.state.placements.forEach((slot, i) => {

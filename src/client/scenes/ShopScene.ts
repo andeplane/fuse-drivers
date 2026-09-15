@@ -3,6 +3,7 @@ import { config } from '../../shared/config.ts';
 import { botShop, buy, cost, standings, UPGRADES, type UpgradeKind } from '../../shared/series.ts';
 import { FONT, TRUCK_COLORS } from './BootScene.ts';
 import type { SeriesData } from './RaceScene.ts';
+import { backdrop } from './backdrop.ts';
 
 const KINDS: UpgradeKind[] = ['topSpeed', 'accel', 'tires', 'shocks', 'armor', 'nitro'];
 export const COLOR_HEX: Record<(typeof TRUCK_COLORS)[number], string> = { cyan: '#2ee6ff', pink: '#ff4fa3', lime: '#9cff2e', orange: '#ff9a2e', violet: '#b45cff' };
@@ -13,6 +14,7 @@ export class ShopScene extends Phaser.Scene {
 
   create(data: SeriesData) {
     const { width, height } = config.screen;
+    backdrop(this);
     let series = { ...data.series, drivers: data.series.drivers.map((d) => (d.slot === 0 ? d : botShop(d))) };
     let cursor = 0;
     this.add.text(width / 2, 60, `SHOP  ·  RACE ${series.raceIndex + 1} / ${series.tracks.length} NEXT: ${series.tracks[series.raceIndex].toUpperCase()}`, { ...FONT, fontSize: '44px', color: '#ffd23f' }).setOrigin(0.5);
