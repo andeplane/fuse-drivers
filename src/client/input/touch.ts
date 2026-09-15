@@ -51,6 +51,8 @@ export function createTouchControls(options: { overlay?: boolean; onChange?: (in
   document.body.append(root);
 
   const pointers = new Map<number, Key>();
+  /** Pointers currently pressed, so a thumb crossing the gap between buttons keeps steering when it reaches the next one. */
+  const down = new Set<number>();
   let current = NEUTRAL_INPUT;
   const compute = (): TruckInput => {
     const held = new Set(pointers.values());
@@ -63,13 +65,14 @@ export function createTouchControls(options: { overlay?: boolean; onChange?: (in
     if (JSON.stringify(next) !== JSON.stringify(current)) { current = next; options.onChange?.(next); }
   };
   const track = (e: PointerEvent) => {
-    if (e.type === 'pointermove' && !pointers.has(e.pointerId)) return;
+    if (e.type === 'pointerdown') down.add(e.pointerId);
+    else if (!down.has(e.pointerId)) return;
     e.preventDefault();
     const key = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-key]')?.dataset.key as Key | undefined;
     if (key && root.contains(els.get(key)!)) pointers.set(e.pointerId, key); else pointers.delete(e.pointerId);
     refresh();
   };
-  const release = (e: PointerEvent) => { pointers.delete(e.pointerId); refresh(); };
+  const release = (e: PointerEvent) => { down.delete(e.pointerId); pointers.delete(e.pointerId); refresh(); };
   root.addEventListener('pointerdown', track);
   root.addEventListener('pointermove', track);
   for (const type of ['pointerup', 'pointercancel'] as const) root.addEventListener(type, release);
