@@ -53,4 +53,33 @@ for color in ['cyan', 'pink', 'lime', 'orange', 'violet']:
         sheet.alpha_composite(frame, ((i % 4) * TRUCK_CELL, (i // 4) * TRUCK_CELL))
     sheet.save(OUT / f'truck-{color}.png')
 
+
+def bands(mask, axis):
+    """Runs of non-empty rows (axis=1) or columns (axis=0) in a boolean alpha mask; returns [(start, end)]."""
+    proj = mask.any(axis=axis)
+    out, start = [], None
+    for i, v in enumerate(proj):
+        if v and start is None: start = i
+        if not v and start is not None: out.append((start, i)); start = None
+    if start is not None: out.append((start, len(proj)))
+    return out
+
+def split_sheet(name, group, cell, min_size=12):
+    """Split a raw sheet into sprites by transparent gaps, row by row, and lay them out on a uniform-cell strip."""
+    import numpy as np
+    im = Image.open(RAW / group / f'{name}.png').convert('RGBA')
+    a = np.array(im)[:, :, 3] > 32
+    sprites = []
+    for (y0, y1) in bands(a, 1):
+        if y1 - y0 < min_size: continue
+        for (x0, x1) in bands(a[y0:y1], 0):
+            if x1 - x0 < min_size: continue
+            sprites.append(fit(im.crop((x0, y0, x1, y1)), cell))
+    strip = Image.new('RGBA', (cell * len(sprites), cell), (0, 0, 0, 0))
+    for i, sp in enumerate(sprites): strip.paste(sp, (i * cell, 0))
+    strip.save(OUT / f'{name}.png')
+    return len(sprites)
+
+counts = {name: split_sheet(name, 'items', 128) for name in ['itembox', 'icons', 'projectiles', 'explosion', 'markers', 'dust']}
+print('item sheets (sprites per strip):', counts)
 print('built', sorted(p.name for p in OUT.iterdir()))
