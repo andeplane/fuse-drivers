@@ -12,7 +12,7 @@ export class PartyShopScene extends Phaser.Scene {
   constructor() { super('PartyShop'); }
 
   create(data: { link: PartyLink; shop: ShopMessage }) {
-    const { width, height } = config.world;
+    const { width, height } = config.screen;
     let shop = data.shop;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6);
     this.add.text(width / 2, 70, 'SHOP  ·  BUY ON YOUR PHONE', { ...FONT, fontSize: '56px', color: '#ffd23f' }).setOrigin(0.5);

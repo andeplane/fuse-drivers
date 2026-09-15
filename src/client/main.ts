@@ -13,9 +13,9 @@ import { ShopScene } from './scenes/ShopScene.ts';
 startAudio(new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  width: config.world.width,
-  height: config.world.height,
-  backgroundColor: '#6b4a24',
+  width: config.screen.width,
+  height: config.screen.height,
+  backgroundColor: '#1a1208',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   render: { antialias: true, pixelArt: false, roundPixels: false },
   scene: [BootScene, MenuScene, RaceScene, HudScene, ResultsScene, ShopScene, LobbyScene, PartyShopScene],

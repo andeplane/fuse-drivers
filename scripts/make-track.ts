@@ -1,10 +1,15 @@
 /**
  * Writes tracks/<name>.tmj from a centerline definition so the map stays editable in Tiled.
  * Usage: npx tsx scripts/make-track.ts
+ *
+ * The world is 1024 x 512 u and the race camera zooms it to fill the screen under the HUD (ADR 003 amendment),
+ * so a 90 u lane reads like the concept art. Lanes run in rows and columns 115 u apart: a 90 u lane plus the
+ * barrier between neighbours. Keep lane centres at least 80 u from the side edges and 90 u from the top so
+ * the stadium fits around them.
  */
 import { writeFileSync } from 'node:fs';
 
-const TILE = 32, COLS = 50, ROWS = 28, HALF_WIDTH = 45;
+const TILE = 32, COLS = 32, ROWS = 16, HALF_WIDTH = 45;
 import { SURFACE_KINDS as SURFACES, type SurfaceKind as Surface } from '../src/shared/config.ts';
 type P = { x: number; y: number };
 
@@ -30,26 +35,21 @@ interface TrackDef {
 const dist = (a: P, b: P) => Math.hypot(a.x - b.x, a.y - b.y);
 const inCircle = (c: P, r: number) => (p: P) => dist(p, c) <= r;
 const inRect = (x0: number, y0: number, x1: number, y1: number) => (p: P) => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
+const pts = (...xy: number[]) => Array.from({ length: xy.length / 2 }, (_, i) => ({ x: xy[2 * i], y: xy[2 * i + 1] }));
 
-/** Refinery: ten corners in a folded S, two hairpins around toxic, moguls on the top straight, one ramp (PLAN.md). */
+/** Refinery: a folded S of four lanes, two hairpins around toxic pools, moguls on the top straight, a ramp on the right (PLAN.md). */
 const refinery: TrackDef = {
   name: 'refinery',
-  control: [
-    { x: 800, y: 830 }, { x: 1250, y: 830 }, { x: 1480, y: 720 }, { x: 1480, y: 560 }, { x: 1330, y: 470 },
-    { x: 1180, y: 560 }, { x: 1100, y: 700 }, { x: 900, y: 700 }, { x: 700, y: 700 }, { x: 560, y: 620 },
-    { x: 600, y: 480 }, { x: 800, y: 430 }, { x: 1000, y: 400 }, { x: 1150, y: 300 }, { x: 1000, y: 180 },
-    { x: 600, y: 180 }, { x: 300, y: 240 }, { x: 160, y: 400 }, { x: 200, y: 600 }, { x: 350, y: 700 },
-    { x: 450, y: 790 }, { x: 600, y: 830 },
-  ],
-  corners: [2, 4, 6, 9, 11, 13, 16, 18, 20],
+  control: pts(520, 437, 860, 437, 944, 380, 944, 150, 880, 92, 520, 92, 140, 92, 82, 149, 140, 207, 500, 207, 770, 207, 827, 264, 770, 322, 500, 322, 140, 322, 82, 379, 140, 437),
+  corners: [3, 5, 8, 10, 12, 14, 16],
   zones: [
-    { surface: 'boost', test: inRect(830, 780, 890, 880) },
-    { surface: 'ramp', test: inRect(1420, 620, 1540, 660) },
-    { surface: 'mogul', test: (p) => p.y > 130 && p.y < 230 && [700, 780, 860, 940].some((x) => Math.abs(p.x - x) < 16) },
-    { surface: 'toxic', test: inCircle({ x: 1330, y: 540 }, 60) },
-    { surface: 'toxic', test: inCircle({ x: 200, y: 560 }, 60) },
+    { surface: 'boost', test: inRect(560, 392, 600, 482) },
+    { surface: 'ramp', test: inRect(890, 250, 1000, 272) },
+    { surface: 'mogul', test: (p) => p.y > 47 && p.y < 137 && [620, 680, 740].some((x) => Math.abs(p.x - x) < 14) },
+    { surface: 'toxic', test: inCircle({ x: 770, y: 264 }, 50) },
+    { surface: 'toxic', test: inCircle({ x: 140, y: 379 }, 50) },
   ],
-  items: [{ x: 550, y: 150 }, { x: 550, y: 180 }, { x: 550, y: 210 }],
+  items: pts(300, 72, 300, 92, 300, 112),
 };
 
 function catmullRom(pts: P[], perSegment: number): P[] {
@@ -81,15 +81,21 @@ function distToPolyline(p: P, line: P[], closed: boolean): number {
 }
 
 type Tagged = P & { src: number };
-/** Offset a closed centerline by `d` (sign picks the side), dropping points that fold back on tight corners. Keeps the source sample index. */
-function offset(center: P[], d: number): Tagged[] {
+/**
+ * Offset a closed centerline by `d` (sign picks the side), dropping points that fold back on tight corners. Keeps the source
+ * sample index. Only the nearby stretch of centerline counts, so a lane crossing this one (a bridge) does not delete its walls.
+ */
+function offset(center: P[], d: number, window = Math.floor(center.length / 2)): Tagged[] {
   const n = center.length;
   const raw = center.map((p, i) => {
     const a = center[(i - 1 + n) % n], b = center[(i + 1) % n];
     const tx = b.x - a.x, ty = b.y - a.y, len = Math.hypot(tx, ty) || 1;
     return { x: p.x - (ty / len) * d, y: p.y + (tx / len) * d, src: i };
   });
-  return raw.filter((p) => distToPolyline(p, center, true) >= Math.abs(d) - 1);
+  return raw.filter((p) => {
+    const local = Array.from({ length: 2 * window + 1 }, (_, k) => center[(p.src - window + k + n) % n]);
+    return distToPolyline(p, local, false) >= Math.abs(d) - 1;
+  });
 }
 
 /** Split a wall ring into plain, `under` and `deck` polylines around a bridge crossing. */
@@ -141,7 +147,9 @@ function build(def: TrackDef) {
   let id = 1;
   const poly = (name: string, pts: P[], key: 'polyline' | 'polygon') => ({ id: id++, name, x: 0, y: 0, [key]: pts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })), visible: true, rotation: 0 });
 
-  const outer = offset(center, HALF_WIDTH), inner = offset(center, -HALF_WIDTH);
+  // A crossing lane would delete this lane's walls where they pass over it, so bridge tracks only look at the local stretch.
+  const window = def.bridge ? 24 : undefined;
+  const outer = offset(center, HALF_WIDTH, window), inner = offset(center, -HALF_WIDTH, window);
   /** Distance along the ray p + s*dir to the nearest wall hit, so checkpoints span exactly the lane (plus a hair). */
   const rayToWalls = (p: P, dir: P): number => {
     let best = Infinity;
@@ -195,47 +203,36 @@ function build(def: TrackDef) {
   };
 }
 
-/** Sump: tight technical layout, a water crossing, two ramps in sequence, a narrow tarmac section (PLAN.md). */
+/** Sump: tight technical zig-zag of four rows, a water crossing, two ramps in sequence, a tarmac straight (PLAN.md). */
 const sump: TrackDef = {
   name: 'sump',
-  control: [
-    { x: 520, y: 840 }, { x: 800, y: 840 }, { x: 1000, y: 800 }, { x: 1250, y: 840 }, { x: 1480, y: 760 },
-    { x: 1480, y: 560 }, { x: 1300, y: 470 }, { x: 1120, y: 560 }, { x: 1000, y: 660 }, { x: 800, y: 660 },
-    { x: 640, y: 560 }, { x: 700, y: 400 }, { x: 900, y: 360 }, { x: 1150, y: 400 }, { x: 1400, y: 300 },
-    { x: 1300, y: 160 }, { x: 1000, y: 130 }, { x: 700, y: 170 }, { x: 450, y: 130 }, { x: 200, y: 200 },
-    { x: 130, y: 400 }, { x: 200, y: 600 }, { x: 150, y: 740 }, { x: 300, y: 830 },
-  ],
-  corners: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+  control: pts(380, 92, 700, 92, 886, 92, 944, 149, 886, 207, 560, 207, 255, 207, 197, 264, 255, 322, 560, 322, 886, 322, 944, 380, 886, 437, 500, 437, 140, 437, 82, 380, 82, 150, 140, 92),
+  corners: [2, 4, 6, 8, 10, 12, 14, 16],
   zones: [
-    { surface: 'boost', test: inRect(550, 790, 610, 890) },
-    { surface: 'water', test: inCircle({ x: 850, y: 660 }, 70) },
-    { surface: 'ramp', test: inRect(1420, 700, 1540, 740) },
-    { surface: 'ramp', test: inRect(1420, 600, 1540, 640) },
-    { surface: 'tarmac', test: inRect(650, 90, 1050, 220) },
-    { surface: 'toxic', test: inCircle({ x: 1300, y: 530 }, 55) },
-    { surface: 'mud', test: inCircle({ x: 165, y: 500 }, 80) },
+    { surface: 'boost', test: inRect(410, 47, 450, 137) },
+    { surface: 'water', test: inCircle({ x: 560, y: 322 }, 60) },
+    { surface: 'ramp', test: inRect(30, 300, 135, 318) },
+    { surface: 'ramp', test: inRect(30, 228, 135, 246) },
+    { surface: 'tarmac', test: inRect(250, 390, 750, 485) },
+    { surface: 'toxic', test: inCircle({ x: 886, y: 149 }, 50) },
+    { surface: 'mud', test: inCircle({ x: 720, y: 207 }, 50) },
   ],
-  items: [{ x: 1100, y: 785 }, { x: 1100, y: 815 }, { x: 1100, y: 845 }],
+  items: pts(400, 187, 400, 207, 400, 227),
 };
 
-/** Sidewinder: figure-eight with an orthogonal bridge crossing at (800,500), mud in the left loop, oil at the crossing exit (PLAN.md). */
+/** Sidewinder: figure-eight with an orthogonal bridge crossing at (512,322), mud in the left loop, oil at the deck exit (PLAN.md). */
 const sidewinder: TrackDef = {
   name: 'sidewinder',
-  control: [
-    { x: 1240, y: 840 }, { x: 1400, y: 800 }, { x: 1500, y: 680 }, { x: 1500, y: 400 }, { x: 1350, y: 200 },
-    { x: 1100, y: 170 }, { x: 1000, y: 330 }, { x: 930, y: 500 }, { x: 800, y: 500 }, { x: 620, y: 510 },
-    { x: 380, y: 640 }, { x: 170, y: 560 }, { x: 140, y: 340 }, { x: 320, y: 180 }, { x: 560, y: 180 },
-    { x: 760, y: 300 }, { x: 800, y: 420 }, { x: 800, y: 500 }, { x: 830, y: 630 }, { x: 900, y: 760 }, { x: 1000, y: 840 },
-  ],
-  corners: [2, 4, 6, 10, 12, 13, 15, 19],
+  control: pts(240, 437, 140, 437, 82, 380, 82, 150, 140, 92, 330, 92, 387, 149, 330, 207, 255, 207, 197, 264, 255, 322, 512, 322, 680, 322, 737, 380, 794, 437, 886, 437, 944, 380, 944, 150, 886, 92, 570, 92, 512, 150, 512, 322, 512, 382, 455, 437),
+  corners: [3, 5, 8, 12, 15, 17, 19],
   zones: [
-    { surface: 'boost', test: inRect(1270, 790, 1330, 890) },
-    { surface: 'mud', test: inCircle({ x: 300, y: 640 }, 70) },
-    { surface: 'oil', test: inCircle({ x: 830, y: 650 }, 40) },
-    { surface: 'toxic', test: inCircle({ x: 1310, y: 300 }, 50) },
+    { surface: 'boost', test: inRect(160, 392, 200, 482) },
+    { surface: 'mud', test: inCircle({ x: 82, y: 265 }, 55) },
+    { surface: 'oil', test: inCircle({ x: 500, y: 412 }, 30) },
+    { surface: 'toxic', test: inCircle({ x: 330, y: 149 }, 50) },
   ],
-  items: [{ x: 1200, y: 150 }, { x: 1200, y: 180 }, { x: 1200, y: 210 }],
-  bridge: { center: { x: 800, y: 500 }, half: 70, deck: [16, 17], entry: 'top' },
+  items: pts(730, 72, 730, 92, 730, 112),
+  bridge: { center: { x: 512, y: 322 }, half: 60, deck: [20, 21], entry: 'top' },
 };
 
 for (const def of [refinery, sump, sidewinder]) {

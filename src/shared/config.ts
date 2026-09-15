@@ -34,7 +34,10 @@ export const BASE_STATS: TruckStats = {
 export const BOT_LEVELS = ['hard', 'normal', 'easy', 'hard'] as const;
 
 export const config = {
-  world: { width: 1600, height: 900 },
+  /** Simulation world in units (map plus the 4 u strip below it, ADR 003). */
+  world: { width: 1024, height: 516 },
+  /** Canvas size; the race camera zooms the world to fill it below the HUD strip. */
+  screen: { width: 1600, height: 900 },
   tile: 32,
   laps: 4,
   countdownTicks: 90,

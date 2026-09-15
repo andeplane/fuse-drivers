@@ -11,7 +11,7 @@ export class ResultsScene extends Phaser.Scene {
   constructor() { super('Results'); }
 
   create(data: SeriesData & { state: RaceState; party?: PartyData }) {
-    const { width, height } = config.world;
+    const { width, height } = config.screen;
     const nameOf = (slot: number) => (data.party ? data.party.names[slot] ?? `BOT ${slot}` : slot === 0 ? 'YOU' : `BOT ${slot}`);
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6);
     const last = data.series.raceIndex >= data.series.tracks.length;

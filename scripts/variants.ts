@@ -8,7 +8,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 type Json = Record<string, unknown>;
 type P = { x: number; y: number };
 
-const WIDTH = 1600;
+const WIDTH = 1024; // map width in units (32 tiles of 32 u)
 const MIRROR_ENTRY: Record<string, string> = { left: 'right', right: 'left', top: 'top', bottom: 'bottom' };
 
 function mirrorObject(o: Json): Json {

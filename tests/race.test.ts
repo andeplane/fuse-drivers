@@ -38,7 +38,7 @@ test('replay is deterministic and matches the recorded hash', () => {
   assert.equal(hash(a), hash(b));
   assert.equal(JSON.stringify(a), JSON.stringify(JSON.parse(JSON.stringify(a))));
   // Update this hash on purpose only, and say so in the commit message (AGENTS.md).
-  assert.equal(hash(a), '026bf6f6d9de30d7');
+  assert.equal(hash(a), 'e6245f401e33c6ed');
 });
 
 test('countdown holds trucks and rocket start arms a boost', () => {
@@ -105,8 +105,8 @@ test('a truck driven along the waypoints completes laps in order and finishes', 
 
 test('landing on another truck spins it out without damage', () => {
   let s: RaceState = { ...createRace(track, 1, [BASE_STATS, BASE_STATS]), phase: 'racing', tick: 100 };
-  const lander = { ...s.trucks[0], x: 900, y: 830, heading: 0, speed: 300, airborneUntilTick: 101, landAtTick: 101 };
-  const victim = { ...s.trucks[1], x: 915, y: 830, heading: 0, speed: 300 };
+  const lander = { ...s.trucks[0], x: 700, y: 437, heading: 0, speed: 300, airborneUntilTick: 101, landAtTick: 101 };
+  const victim = { ...s.trucks[1], x: 715, y: 437, heading: 0, speed: 300 };
   s = { ...s, trucks: [lander, victim] };
   const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
   assert.ok(r.state.trucks[1].spinUntilTick > r.state.tick);

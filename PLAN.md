@@ -26,7 +26,7 @@ All rules and numbers live in the ADRs, and once `src/shared/config.ts` exists, 
 
 ## The race
 
-1–5 trucks, 4 laps of roughly 12–15 s on a 1600×900 world that is always fully visible. Standing start in reverse championship order, 3-2-1 countdown with a rocket-start window. Race ends when the leader finishes plus 12 s; stragglers rank by progress. Placement points 5/3/2/1/0.
+1–5 trucks, 4 laps of roughly 12–15 s on a 1024×512 world that is always fully visible, zoomed to fill the screen below the HUD. Standing start in reverse championship order, 3-2-1 countdown with a rocket-start window. Race ends when the leader finishes plus 12 s; stragglers rank by progress. Placement points 5/3/2/1/0.
 
 ## Tracks
 
@@ -57,7 +57,7 @@ Each is playable before the next starts.
 
 - Name: Fuse Drivers.
 - Phaser 3, TypeScript, Vite, `tsx --test`. Same stack as Fuse Riders so code ports directly.
-- 30 Hz sim, render interpolated. World 1600×900, 32 u tiles.
+- 30 Hz sim, render interpolated. World 1024×512 u zoomed ×1.5625 on a 1600×900 canvas, 32 u tiles.
 - Tiled for tracks, no in-game editor.
 - Throttle always on, two turn buttons, drift from held turns.
 - Only weapons kill; hazards chip. Kills are bragging rights and $100.

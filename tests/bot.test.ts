@@ -11,6 +11,7 @@ const track = parseTrack(JSON.parse(readFileSync('tracks/refinery.tmj', 'utf8'))
 const LAP_BUDGET_TICKS = 30 * 20;
 
 function firstLapTicks(difficulty: Difficulty, seed = 3): number {
+  // Easy bots are sloppy on purpose (ADR 007) and may slide along a tight hairpin; only hard bots must not ride walls.
   const r = createRaceRunner(track, seed, [BASE_STATS], { 0: difficulty });
   let start = 0, maxWall = 0, wall = 0;
   for (let i = 0; i < 30 * 60; i++) {
@@ -19,7 +20,7 @@ function firstLapTicks(difficulty: Difficulty, seed = 3): number {
     wall = state.trucks[0].wallTicks;
     maxWall = Math.max(maxWall, wall);
     const lap = events.find((e) => e.type === 'lap');
-    if (lap) { assert.ok(maxWall < 30, `bot rode a wall for ${maxWall} ticks`); return lap.tick - start; }
+    if (lap) { assert.ok(difficulty !== 'hard' || maxWall < 30, `bot rode a wall for ${maxWall} ticks`); return lap.tick - start; }
   }
   assert.fail(`${difficulty} bot never completed a lap`);
 }

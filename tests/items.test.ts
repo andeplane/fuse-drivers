@@ -71,11 +71,11 @@ test('shield absorbs exactly one hit, invulnerable ignores, zero armor explodes 
 
 test('two hits on one tick from two owners kill a two-armor truck and credit the second owner', () => {
   let s = racing(1, 3);
-  const victim = at(s.trucks[2], 900, 830, 0, { armor: 2 });
-  const a = at(s.trucks[0], 820, 830, 0), b = at(s.trucks[1], 980, 830, 0);
+  const victim = at(s.trucks[2], 700, 437, 0, { armor: 2 });
+  const a = at(s.trucks[0], 620, 437, 0), b = at(s.trucks[1], 780, 437, 0);
   s = { ...s, trucks: [a, b, victim], mines: [
-    { id: 1, owner: 0, x: 900, y: 830, droppedTick: 0, onBridge: false },
-    { id: 2, owner: 1, x: 902, y: 830, droppedTick: 0, onBridge: false },
+    { id: 1, owner: 0, x: 700, y: 437, droppedTick: 0, onBridge: false },
+    { id: 2, owner: 1, x: 702, y: 437, droppedTick: 0, onBridge: false },
   ], nextId: 3 };
   const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], track);
   const kills = r.events.filter((e) => e.type === 'kill');
@@ -107,8 +107,8 @@ test('a missile sweeps its path, so it cannot tunnel through a truck it overlaps
 
 test('lock-on lands on a lower slot than the owner, and two pickups on one tick roll in slot order', () => {
   let s = racing(1, 2);
-  const shooter = at(s.trucks[1], 820, 830, 0, { item: 'missile' });
-  s = { ...s, trucks: [at(s.trucks[0], 900, 830, 0), shooter] };
+  const shooter = at(s.trucks[1], 620, 437, 0, { item: 'missile' });
+  s = { ...s, trucks: [at(s.trucks[0], 700, 437, 0), shooter] };
   const r = step(s, [NEUTRAL_INPUT, { ...NEUTRAL_INPUT, item: true }], track);
   assert.ok(r.state.trucks[0].lockedUntilTick > r.state.tick);
   let p = racing(2, 2);
@@ -120,10 +120,10 @@ test('lock-on lands on a lower slot than the owner, and two pickups on one tick 
 
 test('a mine and a missile hitting on one tick resolve in launch order', () => {
   let s = racing(1, 3);
-  const victim = at(s.trucks[2], 900, 830, 0, { armor: 2 });
-  s = { ...s, trucks: [at(s.trucks[0], 820, 830, 0), at(s.trucks[1], 980, 830, Math.PI), victim],
-    mines: [{ id: 5, owner: 0, x: 900, y: 830, droppedTick: 0, onBridge: false }],
-    missiles: [{ id: 2, owner: 1, x: 905, y: 830, heading: Math.PI, launchedTick: 0, target: 2, onBridge: false }], nextId: 6 };
+  const victim = at(s.trucks[2], 700, 437, 0, { armor: 2 });
+  s = { ...s, trucks: [at(s.trucks[0], 620, 437, 0), at(s.trucks[1], 780, 437, Math.PI), victim],
+    mines: [{ id: 5, owner: 0, x: 700, y: 437, droppedTick: 0, onBridge: false }],
+    missiles: [{ id: 2, owner: 1, x: 705, y: 437, heading: Math.PI, launchedTick: 0, target: 2, onBridge: false }], nextId: 6 };
   const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], track);
   const kill = r.events.find((e) => e.type === 'kill') as { by: number } | undefined;
   assert.equal(kill?.by, 0, 'mine id 5 launched after missile id 2, so the mine lands the final hit');
@@ -137,14 +137,14 @@ test('toxic cannot kill and a finished truck cannot be hit', () => {
   assert.equal(s.trucks[0].armor, 1);
   assert.equal(s.trucks[0].respawnAtTick, 0);
   let f = racing(1, 2);
-  f = { ...f, trucks: [at(f.trucks[0], 900, 830, 0, { finishedTick: 50 }), f.trucks[1]], mines: [{ id: 1, owner: 1, x: 900, y: 830, droppedTick: 0, onBridge: false }] };
+  f = { ...f, trucks: [at(f.trucks[0], 700, 437, 0, { finishedTick: 50 }), f.trucks[1]], mines: [{ id: 1, owner: 1, x: 700, y: 437, droppedTick: 0, onBridge: false }] };
   const r = step(f, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
   assert.equal(r.events.filter((e) => e.type === 'hit').length, 0);
 });
 
 test('EMP stuns and strips items within range, shield blocks it; drone zaps without spin-out', () => {
   let s = racing(1, 3);
-  s = { ...s, trucks: [at(s.trucks[0], 900, 830, 0, { item: 'emp' }), at(s.trucks[1], 1000, 830, 0, { item: 'mine' }), at(s.trucks[2], 950, 830, 0, { shieldUntilTick: 500 })] };
+  s = { ...s, trucks: [at(s.trucks[0], 700, 437, 0, { item: 'emp' }), at(s.trucks[1], 800, 437, 0, { item: 'mine' }), at(s.trucks[2], 750, 437, 0, { shieldUntilTick: 500 })] };
   const r = step(s, [{ ...NEUTRAL_INPUT, item: true }, NEUTRAL_INPUT, NEUTRAL_INPUT], track);
   assert.ok(r.state.trucks[1].stunUntilTick > r.state.tick);
   assert.equal(r.state.trucks[1].item, null);

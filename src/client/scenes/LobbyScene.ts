@@ -11,7 +11,7 @@ export class LobbyScene extends Phaser.Scene {
 
   create(data: { link: PartyLink }) {
     const link = data.link;
-    const { width, height } = config.world;
+    const { width, height } = config.screen;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55);
     this.add.text(width / 2, 60, 'PARTY', { ...FONT, fontSize: '72px', color: '#ffd23f' }).setOrigin(0.5);
     const code = this.add.text(420, 190, '', { ...FONT, fontSize: '110px', color: '#9cff2e' }).setOrigin(0.5);

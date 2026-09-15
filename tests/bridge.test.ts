@@ -56,13 +56,11 @@ test('a deck truck is held by the railings and never drops onto the under lane s
 test('a missile fired from the deck drops to ground level once past the bridge', () => {
   let s = racing(2);
   const cx = (bridge.x0 + bridge.x1) / 2;
-  // The lane bends right below the crossing; put the victim on the lane and aim the shooter at it.
-  const victimPos = { x: 862, y: 690 };
-  const aim = Math.atan2(victimPos.y - (bridge.y0 + 10), victimPos.x - cx);
-  const shooter = at(s.trucks[0], cx, bridge.y0 + 10, aim, { onBridge: true, item: 'missile' });
-  const victim = at(s.trucks[1], victimPos.x, victimPos.y, Math.PI / 2, { speed: 0 });
-  s = { ...s, trucks: [shooter, victim] };
-  let r = step(s, [{ ...NEUTRAL_INPUT, item: true }, { ...NEUTRAL_INPUT, brake: true }], sidewinder);
+  // An armed missile heading down the deck, and a ground truck just past the deck exit.
+  const shooter = at(s.trucks[0], bridge.x0 - 200, bridge.y0 - 200, 0, { speed: 0 });
+  const victim = at(s.trucks[1], cx - 6, bridge.y1 + 24, Math.PI / 2, { speed: 0 });
+  s = { ...s, trucks: [shooter, victim], missiles: [{ id: 1, owner: 0, x: cx, y: bridge.y1 - 50, heading: Math.PI / 2, launchedTick: 0, target: null, onBridge: true }], nextId: 2 };
+  let r = step(s, [NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], sidewinder);
   assert.equal(r.state.missiles[0].onBridge, true);
   let hit = false;
   for (let i = 0; i < 40 && !hit; i++) { r = step(r.state, [NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], sidewinder); hit = r.events.some((e) => e.type === 'hit'); }

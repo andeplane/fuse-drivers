@@ -9,7 +9,7 @@ export class MenuScene extends Phaser.Scene {
   constructor() { super('Menu'); }
 
   create(data: { tracks: Record<string, Track> }) {
-    const { width, height } = config.world;
+    const { width, height } = config.screen;
     this.add.image(width / 2, height * 0.24, 'logo', 0).setScale(0.9);
     this.add.text(width / 2, height * 0.46, 'SPACE: SINGLE RACE     ENTER: 5-RACE SERIES WITH SHOP', { ...FONT, fontSize: '36px' }).setOrigin(0.5);
     const names = Object.keys(data.tracks).sort();

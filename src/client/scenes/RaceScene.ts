@@ -11,8 +11,8 @@ import type { PartyData } from '../net/party.ts';
 import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
 import { FRAMES, SPRITE_CELL, TILE_PX, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
 
-/** World units per sprite cell: a truck is about 44 u long and the source fills ~95 % of its cell. */
-const TRUCK_SCALE = 46 / (TRUCK_CELL * 0.95);
+/** World units per sprite cell: trucks draw a little larger than their 28 u collision circle, chunky like the concept. */
+const TRUCK_SCALE = 54 / (TRUCK_CELL * 0.95);
 /** World units per sprite pixel for the 128 px item cells: a mine or box is about 36 u across. */
 const SPRITE_SCALE = 36 / SPRITE_CELL;
 
@@ -94,6 +94,9 @@ export class RaceScene extends Phaser.Scene {
     this.runner = data.party?.runner ?? createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
     this.readInput = createKeyboard(this);
     this.drawTrack();
+    // The world is smaller than the screen: zoom it to full width under the HUD strip, as in the concept art.
+    const worldW = this.track.cols * config.tile, worldH = this.track.rows * config.tile, zoom = config.screen.width / worldW;
+    this.cameras.main.setViewport(0, config.screen.height - worldH * zoom, config.screen.width, worldH * zoom).setZoom(zoom).centerOn(worldW / 2, worldH / 2);
     this.trails.clear();
     this.lastTick = -1;
     this.shadows = TRUCK_COLORS.map((c) => this.add.sprite(0, 0, `truck-${c}`, 0).setScale(TRUCK_SCALE).setTintFill(0x000000).setAlpha(0.4).setDepth(9).setVisible(false));
@@ -124,11 +127,11 @@ export class RaceScene extends Phaser.Scene {
     const g = this.make.graphics({}, false);
     const barriers = this.track.walls.filter((w) => !w.deck);
     // Chunky blocks: black outline, a shaded side, a bright top face, black seams between blocks.
-    // 26 u wide stays inside the 2 * truck-radius band the walls already collide with.
+    // 22 u wide: adjacent lanes are 115 u apart, so neighbouring barriers meet like the concept's double rows.
     const block = 18, seam = (d: number) => d % block < 2;
-    strokeWalls(g, barriers, 26, () => 0x000000);
-    strokeWalls(g, barriers, 20, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0x8c8c96 : 0x8a1616));
-    strokeWalls(g, barriers, 12, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xf6f6f6 : 0xe23232));
+    strokeWalls(g, barriers, 22, () => 0x000000);
+    strokeWalls(g, barriers, 17, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0x8c8c96 : 0x8a1616));
+    strokeWalls(g, barriers, 10, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xf6f6f6 : 0xe23232));
     const finish = this.track.checkpoints[this.track.checkpoints.length - 1];
     const fl = Math.hypot(finish.b.x - finish.a.x, finish.b.y - finish.a.y), fx = (finish.b.x - finish.a.x) / fl, fy = (finish.b.y - finish.a.y) / fl;
     for (let d = 0, i = 0; d < fl; d += 8, i++) {
@@ -247,7 +250,7 @@ export class RaceScene extends Phaser.Scene {
     if (count > out.length / 2) { tex.refresh(); this.add.image(0, 0, 'track-ground').setOrigin(0).setDepth(1); return; }
 
     // Stands only along the world edges; open infield between lane loops stays dirt.
-    const band = out.map((v, i) => (v && Math.min(i % gw, gw - 1 - (i % gw), Math.floor(i / gw), gh - 1 - Math.floor(i / gw)) * G < 150 ? 1 : 0));
+    const band = out.map((v, i) => (v && Math.min(i % gw, gw - 1 - (i % gw), Math.floor(i / gw), gh - 1 - Math.floor(i / gw)) * G < 80 ? 1 : 0));
     const mask = (rgb: string) => {
       const c = document.createElement('canvas');
       c.width = gw; c.height = gh;
@@ -302,16 +305,16 @@ export class RaceScene extends Phaser.Scene {
       }
       return undefined;
     };
-    // Banners first, below the top HUD strip so they stay visible.
+    // Banners first; the HUD strip sits above the world now.
     for (const [text, bg, fg] of SPONSORS) {
-      const bw = 120, bh = 30, at = place(bw, bh, 74, band);
+      const bw = 84, bh = 22, at = place(bw, bh, 0, band);
       if (!at) continue;
       ctx.fillStyle = '#000';
       ctx.fillRect(at.x, at.y, bw, bh);
       ctx.fillStyle = bg;
       ctx.fillRect(at.x + 3, at.y + 3, bw - 6, bh - 6);
       ctx.fillStyle = fg;
-      ctx.font = 'italic bold 18px Impact, "Arial Black", sans-serif';
+      ctx.font = 'italic bold 13px Impact, "Arial Black", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, at.x + bw / 2, at.y + bh / 2 + 1, bw - 12);

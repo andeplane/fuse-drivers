@@ -12,7 +12,7 @@ export class ShopScene extends Phaser.Scene {
   constructor() { super('Shop'); }
 
   create(data: SeriesData) {
-    const { width, height } = config.world;
+    const { width, height } = config.screen;
     let series = { ...data.series, drivers: data.series.drivers.map((d) => (d.slot === 0 ? d : botShop(d))) };
     let cursor = 0;
     this.add.text(width / 2, 60, `SHOP  ·  RACE ${series.raceIndex + 1} / ${series.tracks.length} NEXT: ${series.tracks[series.raceIndex].toUpperCase()}`, { ...FONT, fontSize: '44px', color: '#ffd23f' }).setOrigin(0.5);

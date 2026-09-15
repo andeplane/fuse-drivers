@@ -40,7 +40,7 @@ export class HudScene extends Phaser.Scene {
 
   create(data: { race: RaceScene }) {
     this.race = data.race;
-    const { width, height } = config.world;
+    const { width, height } = config.screen;
     const s = this.race.runner.state;
 
     // Top strip: logo, one chip per driver, lap / position / kills / time panel.
