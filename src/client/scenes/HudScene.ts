@@ -42,6 +42,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   private flash(text: string) {
+    this.tweens.killTweensOf(this.big);
     this.big.setText(text).setAlpha(1);
     this.tweens.add({ targets: this.big, alpha: 0, delay: 500, duration: 400 });
   }
