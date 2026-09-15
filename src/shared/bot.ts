@@ -23,6 +23,7 @@ const BRAKE_TAP: Record<Difficulty, number> = { easy: 3, normal: 1, hard: 0 };
 const STEER_DEADBAND = (6 * Math.PI) / 180;
 const STRAIGHT_CONE = (15 * Math.PI) / 180;
 const STRAIGHT_LENGTH = 600;
+const SHARP_TURN = (70 * Math.PI) / 180;
 
 export function createBotMemory(seed: number, slot: number): BotMemory {
   const lateral = ((((seed >>> 0) * 7919 + slot * 104729) >>> 0) % 49) - 24;
@@ -111,10 +112,16 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   const err = wrapAngle(Math.atan2(target.y - t.y, target.x - t.x) - t.heading);
 
   const here = tangentOf(wp, segment);
-  let straight = true;
-  for (let k = 1, d = segmentLength(wp, segment) - along; d < STRAIGHT_LENGTH && straight && k < wp.length; d += segmentLength(wp, segment + k), k++) {
-    straight = Math.abs(wrapAngle(tangentOf(wp, segment + k) - here)) <= STRAIGHT_CONE;
+  let straight = true, sharp = false;
+  // Lanes are only 115 u apart, so a hairpin arrives quickly: brake when the line turns more than 70 degrees within
+  // the distance the truck covers in about half a second.
+  const brakeLook = 40 + 0.45 * t.speed;
+  for (let k = 1, d = segmentLength(wp, segment) - along; (d < STRAIGHT_LENGTH || d < brakeLook) && k < wp.length; d += segmentLength(wp, segment + k), k++) {
+    const turn = Math.abs(wrapAngle(tangentOf(wp, segment + k) - here));
+    if (d < STRAIGHT_LENGTH && turn > STRAIGHT_CONE) straight = false;
+    if (d < brakeLook && turn > SHARP_TURN) sharp = true;
   }
+  const cornerBrake = sharp && t.speed > 0.6 * t.stats.topSpeed;
   const airborneOrSpun = state.tick < t.airborneUntilTick || state.tick < t.spinUntilTick;
   // Wedged against a wall with the throttle on (still within 20 u of where it was a second ago, oscillating included):
   // back out for a second.
@@ -144,7 +151,7 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     left: !release && err < -STEER_DEADBAND,
     right: !release && err > STEER_DEADBAND,
     nitro: straight && !airborneOrSpun && t.nitros > 0 && !t.prevNitro && state.tick >= t.nitroUntilTick,
-    brake: straight && state.tick % 30 < BRAKE_TAP[difficulty],
+    brake: cornerBrake || (straight && state.tick % 30 < BRAKE_TAP[difficulty]),
     item: wantsItem(state, t),
     // Fire a missile backwards when the threat is behind and nobody is ahead in the cone.
     itemAlt: t.item === 'missile' && !state.trucks.some((o) => o.slot !== t.slot && !o.respawnAtTick && Math.hypot(o.x - t.x, o.y - t.y) < 500 && Math.abs(wrapAngle(Math.atan2(o.y - t.y, o.x - t.x) - t.heading)) < config.items.missile.lockCone),
