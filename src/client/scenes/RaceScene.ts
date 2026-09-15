@@ -287,17 +287,36 @@ export class RaceScene extends Phaser.Scene {
     pool('water', '#5a4020', '#3f94e6', '#2464b4', 'rgba(225,245,255,0.85)');
     pool('mud', '#4a2e14', '#6a4422', '#4e3016', 'rgba(170,125,80,0.5)');
 
-    const oil = cells('oil');
-    if (oil.length) {
-      blob(oil, 24, 'rgba(0,0,0,0.35)');
-      blob(oil, 20, '#141418');
-      ctx.lineWidth = 2;
-      for (const p of oil) for (const [c, r] of [['rgba(255,80,200,0.35)', 9], ['rgba(80,200,255,0.35)', 13], ['rgba(255,230,80,0.3)', 16]] as const) {
+    // Oil: one flat glossy slick per patch with an irregular edge, a rainbow sheen and a white glint.
+    for (const e of ellipses('oil')) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      for (let k = 0; k <= 24; k++) {
+        const a = (k / 24) * Math.PI * 2, wob = 1 + 0.12 * Math.sin(a * 3 + e.x) + 0.08 * Math.sin(a * 5 + e.y);
+        ctx.lineTo(e.x + Math.cos(a) * (e.rx + 3) * wob, e.y + Math.sin(a) * (e.ry + 2) * wob);
+      }
+      ctx.fill();
+      const g = ctx.createRadialGradient(e.x - e.rx * 0.3, e.y - e.ry * 0.3, 2, e.x, e.y, Math.max(e.rx, e.ry));
+      g.addColorStop(0, '#3a3a48');
+      g.addColorStop(1, '#0a0a10');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      for (let k = 0; k <= 24; k++) {
+        const a = (k / 24) * Math.PI * 2, wob = 1 + 0.12 * Math.sin(a * 3 + e.x) + 0.08 * Math.sin(a * 5 + e.y);
+        ctx.lineTo(e.x + Math.cos(a) * e.rx * wob, e.y + Math.sin(a) * e.ry * wob);
+      }
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      for (const [c, f] of [['rgba(255,70,200,0.55)', 0.55], ['rgba(70,220,255,0.55)', 0.68], ['rgba(255,230,70,0.45)', 0.8]] as const) {
         ctx.strokeStyle = c;
         ctx.beginPath();
-        ctx.arc(p.x + 3, p.y - 2, r, 3.6, 5.4);
+        ctx.ellipse(e.x + e.rx * 0.1, e.y, e.rx * f, e.ry * f, 0, 3.4, 5.6);
         ctx.stroke();
       }
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.ellipse(e.x - e.rx * 0.35, e.y - e.ry * 0.35, e.rx * 0.18, e.ry * 0.08, -0.4, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     const tarmac = cells('tarmac');
