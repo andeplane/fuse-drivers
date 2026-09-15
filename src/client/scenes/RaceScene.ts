@@ -38,11 +38,15 @@ export class RaceScene extends Phaser.Scene {
   mines = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
   readInput!: ReturnType<typeof createKeyboard>;
+  finishedAt = 0;
 
   constructor() { super('Race'); }
 
   create(data: RaceSceneData) {
     this.track = data.track;
+    this.finishedAt = 0;
+    this.missiles.clear();
+    this.mines.clear();
     const bots = Object.fromEntries(BOT_LEVELS.map((d, i) => [i + 1, d]));
     this.runner = createRaceRunner(this.track, data.seed, Array(5).fill(BASE_STATS), bots);
     this.readInput = createKeyboard(this);
@@ -86,6 +90,10 @@ export class RaceScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     const { state, events } = this.runner.advance(delta, [this.readInput()]);
+    if (state.phase === 'finished' && !this.finishedAt) {
+      this.finishedAt = this.time.now;
+      this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: this.runner.state, track: this.track }); });
+    }
     for (const e of events) {
       this.game.events.emit('race-event', e satisfies RaceEvent);
       if (e.type === 'kill') {

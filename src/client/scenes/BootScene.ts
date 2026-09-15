@@ -24,6 +24,6 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     const track = parseTrack(JSON.parse(refineryRaw), 'refinery');
-    this.scene.start('Race', { track, seed: Date.now() >>> 0 });
+    this.scene.start('Menu', { track });
   }
 }
