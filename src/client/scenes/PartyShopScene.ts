@@ -10,7 +10,11 @@ interface ShopMessage { series: Series; until: number; names: Record<number, str
 
 /** Party shop on the TV: players buy on their phones; the race starts when everyone is ready or time is up. */
 export class PartyShopScene extends Phaser.Scene {
+  private tickClock?: () => void;
+
   constructor() { super('PartyShop'); }
+
+  update() { this.tickClock?.(); }
 
   create(data: { link: PartyLink; shop: ShopMessage }) {
     const { width, height } = config.screen;
@@ -35,7 +39,9 @@ export class PartyShopScene extends Phaser.Scene {
     const onShop = (m: ShopMessage) => { shop = m; redraw(); };
     this.game.events.on('party-shop', onShop);
     this.events.once('shutdown', () => this.game.events.off('party-shop', onShop));
-    this.events.on('update', () => clock.setText(`${Math.max(0, Math.ceil((shop.until - Date.now()) / 1000))} s`));
+    // Scene update listeners survive shutdown, so the clock runs from update() and is cleared on shutdown.
+    this.tickClock = () => clock.setText(`${Math.max(0, Math.ceil((shop.until - Date.now()) / 1000))} s`);
+    this.events.once('shutdown', () => { this.tickClock = undefined; });
     redraw();
     this.input.keyboard!.on('keydown-SPACE', (e: KeyboardEvent) => { if (!e.repeat) data.link.send({ t: 'next' }); });
   }
