@@ -26,6 +26,8 @@ export class HudScene extends Phaser.Scene {
     this.status = this.add.text(96, config.world.height - 44, '', { ...FONT, fontSize: '22px' });
     this.slot = this.add.image(48, config.world.height - 48, 'icons', FRAMES.icons.empty).setScale(0.5);
     this.kills = this.add.text(480, 12, '', FONT);
+    const s = this.race.series;
+    this.add.text(config.world.width / 2, 12, s.tracks.length > 1 ? `RACE ${s.raceIndex + 1}/${s.tracks.length}  ${s.tracks[s.raceIndex].toUpperCase()}` : s.tracks[s.raceIndex].toUpperCase(), FONT).setOrigin(0.5, 0);
     this.big = this.add.text(config.world.width / 2, config.world.height / 2, '', { ...FONT, fontSize: '120px', color: '#ffd23f' }).setOrigin(0.5);
     this.game.events.on('race-event', this.onEvent, this);
     this.events.once('shutdown', () => this.game.events.off('race-event', this.onEvent, this));

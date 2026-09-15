@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { BASE_STATS, config, SURFACE_KINDS } from '../../shared/config.ts';
+import { config, SURFACE_KINDS } from '../../shared/config.ts';
+import { applyRace, statsFor, type Series } from '../../shared/series.ts';
 import type { RaceEvent } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
 import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
@@ -27,7 +28,7 @@ function syncSet<T extends { id: number }>(map: Map<number, Phaser.GameObjects.I
   for (const [id, img] of map) if (!seen.has(id)) { img.destroy(); map.delete(id); }
 }
 
-export interface RaceSceneData { track: Track; seed: number }
+export interface RaceSceneData { series: Series; tracks: Record<string, Track> }
 
 export class RaceScene extends Phaser.Scene {
   runner!: RaceRunner;
@@ -42,18 +43,23 @@ export class RaceScene extends Phaser.Scene {
   marks!: Phaser.GameObjects.Graphics;
   readInput!: ReturnType<typeof createKeyboard>;
   finishedAt = 0;
+  series!: Series;
+  tracks!: Record<string, Track>;
+  deck!: Phaser.GameObjects.Graphics;
 
   constructor() { super('Race'); }
 
   create(data: RaceSceneData) {
-    this.track = data.track;
+    this.series = data.series;
+    this.tracks = data.tracks;
+    this.track = data.tracks[data.series.tracks[data.series.raceIndex]];
     this.finishedAt = 0;
     this.missiles.clear();
     this.mines.clear();
     this.oils.clear();
     this.drones.clear();
     const bots = Object.fromEntries(BOT_LEVELS.map((d, i) => [i + 1, d]));
-    this.runner = createRaceRunner(this.track, data.seed, Array(5).fill(BASE_STATS), bots);
+    this.runner = createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
     this.readInput = createKeyboard(this);
     this.drawTrack();
     this.sprites = TRUCK_COLORS.map((c, i) => {
@@ -89,6 +95,11 @@ export class RaceScene extends Phaser.Scene {
         g.beginPath().moveTo(w.a.x + ux * d, w.a.y + uy * d).lineTo(w.a.x + ux * e, w.a.y + uy * e).strokePath();
       }
     }
+    for (const b of this.track.bridges) {
+      const deck = this.add.graphics().setDepth(12);
+      deck.fillStyle(0x4a4a52).fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+      deck.lineStyle(6, 0x222226).strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    }
     const finish = this.track.checkpoints[this.track.checkpoints.length - 1];
     g.lineStyle(10, 0xffffff).beginPath().moveTo(finish.a.x, finish.a.y).lineTo(finish.b.x, finish.b.y).strokePath();
   }
@@ -97,7 +108,7 @@ export class RaceScene extends Phaser.Scene {
     const { state, events } = this.runner.advance(delta, [this.readInput()]);
     if (state.phase === 'finished' && !this.finishedAt) {
       this.finishedAt = this.time.now;
-      this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: this.runner.state, track: this.track }); });
+      this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: this.runner.state, series: applyRace(this.series, this.runner.state), tracks: this.tracks }); });
     }
     for (const e of events) {
       this.game.events.emit('race-event', e satisfies RaceEvent);
@@ -118,7 +129,7 @@ export class RaceScene extends Phaser.Scene {
     poses.forEach((p, i) => {
       const t = state.trucks[i];
       const air = state.tick < t.airborneUntilTick;
-      this.sprites[i].setPosition(p.x, p.y).setFrame(headingFrame(p.heading)).setScale(TRUCK_SCALE * (air ? 1.25 : 1)).setVisible(!t.respawnAtTick);
+      this.sprites[i].setPosition(p.x, p.y).setFrame(headingFrame(p.heading)).setScale(TRUCK_SCALE * (air ? 1.25 : 1)).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
       if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
       this.sprites[i].setTint(state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
