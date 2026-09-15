@@ -138,6 +138,8 @@ const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js
 const server = createServer((req, res) => {
   let path: string;
   try { path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname); } catch { res.writeHead(400).end(); return; }
+  // Hosting platforms poll this to know the process is up and how busy it is.
+  if (path === '/healthz') { res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, rooms: parties.size })); return; }
   if (path === '/') path = '/index.html';
   if (path === '/pad') path = '/pad.html';
   const file = resolve(DIST, `.${path}`);
