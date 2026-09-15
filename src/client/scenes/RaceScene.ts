@@ -138,6 +138,19 @@ export class RaceScene extends Phaser.Scene {
     this.shields = this.sprites.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 1.6).setDepth(11).setVisible(false));
     this.boxes = this.track.items.map((p) => this.add.sprite(p.x, p.y, 'itembox', 0).setScale(SPRITE_SCALE).setDepth(4).play('box-pulse'));
     this.marks = this.add.graphics().setDepth(12);
+    // Dropped oil uses the same glossy slick as the track's oil patches instead of the flat top-down splat.
+    if (!this.textures.exists('oil-slick')) {
+      const size = 128, tex = this.textures.createCanvas('oil-slick', size, size)!, c = tex.getContext(), m = size / 2, r = size * 0.44;
+      const edge = (scale: number) => { c.beginPath(); for (let k = 0; k <= 24; k++) { const a = (k / 24) * Math.PI * 2, wob = 1 + 0.12 * Math.sin(a * 3) + 0.08 * Math.sin(a * 5 + 1); c.lineTo(m + Math.cos(a) * r * scale * wob, m + Math.sin(a) * r * 0.8 * scale * wob); } };
+      edge(1.06); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fill();
+      const g = c.createRadialGradient(m - r * 0.3, m - r * 0.3, 2, m, m, r);
+      g.addColorStop(0, '#3a3a48'); g.addColorStop(1, '#0a0a10');
+      edge(1); c.fillStyle = g; c.fill();
+      c.lineWidth = 5;
+      for (const [col, f] of [['rgba(255,70,200,0.55)', 0.55], ['rgba(70,220,255,0.55)', 0.68], ['rgba(255,230,70,0.45)', 0.8]] as const) { c.strokeStyle = col; c.beginPath(); c.ellipse(m + r * 0.1, m, r * f, r * 0.8 * f, 0, 3.4, 5.6); c.stroke(); }
+      c.fillStyle = 'rgba(255,255,255,0.7)'; c.beginPath(); c.ellipse(m - r * 0.35, m - r * 0.3, r * 0.18, r * 0.07, -0.4, 0, Math.PI * 2); c.fill();
+      tex.refresh();
+    }
     this.scene.launch('Hud', { race: this });
   }
 
@@ -658,7 +671,7 @@ export class RaceScene extends Phaser.Scene {
       trail.slice(0, -1).forEach((pt, k) => this.marks.fillStyle(0xff3030, (k + 1) / trail.length).fillCircle(pt.x, pt.y, 3.5));
     }
     syncSet(this.mines, state.mines, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.mineUnarmed).setScale(SPRITE_SCALE * 0.7).setDepth(3), (img, m) => img.setFrame(state.tick - m.droppedTick >= config.items.mine.armTicks && state.tick % 10 < 5 ? FRAMES.projectiles.mineArmed : FRAMES.projectiles.mineUnarmed));
-    syncSet(this.oils, state.oils, (o) => this.add.image(o.x, o.y, 'projectiles', FRAMES.projectiles.oil).setScale((config.items.oil.radius * 2) / SPRITE_CELL).setDepth(2), (img, o) => img.setAlpha(Math.min(1, (config.items.oil.lifeTicks - (state.tick - o.droppedTick)) / 60)));
+    syncSet(this.oils, state.oils, (o) => this.add.image(o.x, o.y, 'oil-slick').setScale((config.items.oil.radius * 2) / 128).setDepth(2), (img, o) => img.setAlpha(Math.min(1, (config.items.oil.lifeTicks - (state.tick - o.droppedTick)) / 60)));
     syncSet(this.drones, state.drones, () => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.drone).setScale(SPRITE_SCALE * 0.8).setDepth(13), (img, d) => { const p = dronePosition(d, { ...state.trucks[d.owner], ...poses[d.owner] }, state.tick + alpha); img.setPosition(p.x, p.y).setRotation(state.tick * 0.5); });
     this.boxes.forEach((b, i) => b.setAlpha(state.tick < state.boxCooldowns[i * state.trucks.length] ? 0.4 : 1));
   }
