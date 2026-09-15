@@ -23,9 +23,11 @@ The user set the goal "do not stop until it is great quality" and described the 
 
 ## Open
 
-1. Still short of the concept: mud and water puddles are flat ovals, oil blobs read like tyres, the in-world edge decor (pipes, tanks) is soft, no truck wreck sprite after a kill.
-2. Phone pad page is unstyled DOM; party HUD is only verified with fake sockets.
-3. M4 online hosting (same server on a host) and a real-phone party test.
+1. Still short of the concept: the in-world edge decor (pipes, tanks) is soft; truck wrecks are a darkened truck frame rather than a wreck sprite.
+2. Party flow is verified in two browser tabs (lobby, phone join, race from server snapshots, phone controls) but not yet on a real phone over Wi-Fi.
+3. M4 online hosting (same server on a host).
+
+Verification tips: with the Browser pane hidden Phaser draws no frames; pump `window.game.step(t, 16.7)` from `javascript_tool` and read scene state or DOM instead of screenshots. `resize_window` preset `mobile` emulates touch for the solo touch overlay.
 
 ## Gotchas
 
