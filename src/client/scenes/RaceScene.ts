@@ -284,8 +284,35 @@ export class RaceScene extends Phaser.Scene {
       ctx.lineWidth = 1.5;
       for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.arc(e.x + (rand() - 0.5) * e.rx, e.y + (rand() - 0.5) * e.ry, 1.5 + rand() * 3, 0, Math.PI * 2); ctx.stroke(); }
     }
-    pool('water', '#5a4020', '#3f94e6', '#2464b4', 'rgba(225,245,255,0.85)');
-    pool('mud', '#4a2e14', '#6a4422', '#4e3016', 'rgba(170,125,80,0.5)');
+    /** Stones around a puddle's rim, lit from the top left, like the concept's rocky mud hole. */
+    const stones = (e: { x: number; y: number; rx: number; ry: number }) => {
+      const n = Math.round((e.rx + e.ry) / 5);
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2 + rand() * 0.2, r = 3 + rand() * 3;
+        const x = e.x + Math.cos(a) * (e.rx + 1), y = e.y + Math.sin(a) * (e.ry + 1);
+        ctx.fillStyle = '#1a1008';
+        ctx.beginPath(); ctx.ellipse(x + 1, y + 1.5, r + 1, r * 0.8 + 1, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = k % 3 ? '#7a6a58' : '#9a8a74';
+        ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.3, r * 0.35, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    };
+    /** Ripple arcs across a wet surface. */
+    const ripples = (e: { x: number; y: number; rx: number; ry: number }, color: string) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      for (const f of [0.35, 0.6, 0.82]) { ctx.beginPath(); ctx.ellipse(e.x + e.rx * 0.08, e.y + e.ry * 0.1, e.rx * f, e.ry * f, 0, 0.3, 2.6); ctx.stroke(); }
+    };
+    for (const e of pool('water', '#5a4020', '#3f94e6', '#2464b4', 'rgba(225,245,255,0.85)')) { ripples(e, 'rgba(200,235,255,0.55)'); stones(e); }
+    for (const e of pool('mud', '#4a2e14', '#6a4422', '#4e3016', 'rgba(170,125,80,0.5)')) {
+      // Tyre ruts through the mud, then wet ripples and the stone rim.
+      ctx.strokeStyle = 'rgba(30,18,8,0.55)';
+      ctx.lineWidth = 3;
+      for (const off of [-10, 10]) { ctx.beginPath(); ctx.moveTo(e.x - e.rx * 0.85, e.y + off); ctx.quadraticCurveTo(e.x, e.y + off - e.ry * 0.25, e.x + e.rx * 0.85, e.y + off); ctx.stroke(); }
+      ripples(e, 'rgba(160,120,80,0.45)');
+      stones(e);
+    }
 
     // Oil: one flat glossy slick per patch with an irregular edge, a rainbow sheen and a white glint.
     for (const e of ellipses('oil')) {
@@ -580,10 +607,11 @@ export class RaceScene extends Phaser.Scene {
         (t.onBridge ? this.shadowsHigh : this.shadowsLow).fillStyle(0x000000, air ? 0.22 : 0.38).fillEllipse(p.x + (air ? 6 : 2), p.y + 16, air ? 54 : 46, air ? 20 : 16);
       }
       if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
-      this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
+      this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(true).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
       if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
-      this.sprites[i].setTint(state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
+      // A wrecked truck stays where it died as a charred hulk until it respawns at the last checkpoint.
+      this.sprites[i].setTint(t.respawnAtTick ? 0x3a302a : state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
       if (t.lockedUntilTick > state.tick && !t.respawnAtTick) this.drawLock(p.x, p.y);
     });
     const prevMissiles = new Map(this.runner.previous.missiles.map((m) => [m.id, m]));
