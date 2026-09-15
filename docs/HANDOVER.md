@@ -27,7 +27,7 @@ A background review of the whole session found seven issues, all fixed with comm
 
 ## Open
 
-1. Still short of the concept: the in-world edge decor (pipes, tanks) is soft; truck wrecks are a darkened truck frame rather than a wreck sprite.
+1. Still short of the concept: the in-world edge decor (pipes, tanks) is soft; truck wrecks are a darkened truck frame rather than a wreck sprite. Missiles, mines, drone, shield and EMP now use elevated-camera sprites (`assets/raw/items/projectiles-tilted.png`); dropped oil is a code-drawn glossy slick texture (`oil-slick`).
 2. Party flow is verified in two browser tabs (lobby, phone join, race from server snapshots, phone controls) but not yet on a real phone over Wi-Fi.
 3. M4 online hosting (same server on a host).
 
