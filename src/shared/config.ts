@@ -84,6 +84,7 @@ export const config = {
   } satisfies Record<SurfaceKind, SurfaceRule>,
   items: {
     boxCooldownTicks: 90,
+    boxRadius: 18,
     missile: { speed: 600, turnRate: deg(200), lifeTicks: 120, radius: 6, lockRange: 600, lockCone: deg(45), armTicks: 10 },
     mine: { dropBehind: 30, lobAhead: 200, armTicks: 15, lifeTicks: 600, radius: 20 },
     shieldTicks: 180,

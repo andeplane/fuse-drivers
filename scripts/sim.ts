@@ -16,6 +16,7 @@ const levels: Difficulty[] = ['hard', 'normal', 'easy', 'hard', 'normal'];
 const MAX_TICKS = 30 * 240;
 
 let failures = 0, totalTicks = 0;
+const totals = { pickups: 0, fires: 0, hits: 0, kills: 0, wrongWay: 0 };
 const lapTimes: number[] = [];
 const t0 = performance.now();
 for (let r = 0; r < races; r++) {
@@ -25,13 +26,17 @@ for (let r = 0; r < races; r++) {
   const lastLap: number[] = Array(n).fill(0);
   const lastProgress: number[] = Array(n).fill(0);
   const stuckSince: number[] = Array(n).fill(0);
-  let wrongWay = 0;
+  let wrongWay = 0, pickups = 0, fires = 0, hitsN = 0, kills = 0, creditable = 0;
   const fail = (msg: string) => { failures++; console.log(`race ${r} seed ${seed} tick ${runner.state.tick}: ${msg}`); };
   while (runner.state.phase !== 'finished' && runner.state.tick < MAX_TICKS) {
     const { state, events } = runner.advance(TICK_MS, []);
     for (const e of events) {
       if (e.type === 'lap') { lapTimes.push((e.tick - lastLap[e.slot]) / 30); lastLap[e.slot] = e.tick; }
       if (e.type === 'wrongWay') wrongWay++;
+      if (e.type === 'pickup') pickups++;
+      if (e.type === 'fire') fires++;
+      if (e.type === 'hit') hitsN++;
+      if (e.type === 'kill') { kills++; if (e.by !== e.slot) creditable++; }
     }
     for (const t of state.trucks) {
       for (const [k, v] of Object.entries(t)) if (typeof v === 'number' && !Number.isFinite(v)) fail(`truck ${t.slot}.${k} is ${v}`);
@@ -41,15 +46,20 @@ for (let r = 0; r < races; r++) {
       else if (!t.finishedTick && state.tick - stuckSince[t.slot] > 300) { fail(`truck ${t.slot} stuck at progress ${t.progress.toFixed(2)}`); stuckSince[t.slot] = state.tick; }
     }
     if (state.tick > 1 && state.placements.length !== n) fail('placements length');
+    if (state.missiles.length > n || state.mines.length > 50) fail(`projectile growth: ${state.missiles.length} missiles ${state.mines.length} mines`);
+    for (const t of state.trucks) if (t.kills > 20 || t.deaths > 20) fail(`implausible kills/deaths on ${t.slot}`);
   }
   totalTicks += runner.state.tick;
+  const credited = runner.state.trucks.reduce((s, t) => s + t.kills, 0);
+  if (credited !== creditable) fail(`kills credited ${credited} but ${creditable} kill events by others`);
   if (runner.state.phase !== 'finished') fail(`did not finish; placements ${runner.state.placements.join(',')} laps ${runner.state.trucks.map((t) => t.laps).join(',')}`);
-  if (wrongWay) console.log(`race ${r}: ${wrongWay} wrong-way events`);
+  totals.pickups += pickups; totals.fires += fires; totals.hits += hitsN; totals.kills += kills; totals.wrongWay += wrongWay;
 }
 const secs = (performance.now() - t0) / 1000;
 lapTimes.sort((a, b) => a - b);
 const q = (p: number) => lapTimes[Math.floor(p * (lapTimes.length - 1))]?.toFixed(1);
 console.log(`${races} races, ${totalTicks} ticks in ${secs.toFixed(2)} s (${Math.round(totalTicks / secs)} ticks/s, ${(totalTicks / 30 / secs).toFixed(0)}x realtime)`);
 console.log(`lap time s: min ${q(0)} p50 ${q(0.5)} p90 ${q(0.9)} max ${q(1)}; race length s: ${(totalTicks / races / 30).toFixed(1)} avg`);
+console.log(`per race: ${(totals.pickups / races).toFixed(1)} pickups, ${(totals.fires / races).toFixed(1)} fires, ${(totals.hits / races).toFixed(1)} hits, ${(totals.kills / races).toFixed(1)} kills, ${(totals.wrongWay / races).toFixed(1)} wrong-way`);
 console.log(failures ? `FAIL: ${failures} invariant failures` : 'OK: no invariant failures');
 process.exit(failures ? 1 : 0);

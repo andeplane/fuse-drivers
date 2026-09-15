@@ -2,7 +2,7 @@ import { config } from './config.ts';
 import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import type { RaceState } from './race.ts';
 import type { Point, Track } from './track.ts';
-import { wrapAngle } from './truck.ts';
+import { wrapAngle, type Truck } from './truck.ts';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -53,6 +53,20 @@ function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: n
   return { p: wp[i], tangent: 0 };
 }
 
+/** ADR 007 item rules: missile at a truck ahead in the cone, mine at a truck behind, shield when locked, nitro at once. */
+function wantsItem(state: RaceState, t: Truck): boolean {
+  if (!t.item || state.tick < t.airborneUntilTick) return false;
+  const others = state.trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick);
+  const rel = (o: Truck) => ({ d: Math.hypot(o.x - t.x, o.y - t.y), a: Math.abs(wrapAngle(Math.atan2(o.y - t.y, o.x - t.x) - t.heading)) });
+  switch (t.item) {
+    case 'missile': return others.some((o) => { const r = rel(o); return r.d < 500 && r.a < config.items.missile.lockCone; });
+    case 'mine': return others.some((o) => { const r = rel(o); return r.d < 300 && r.a > Math.PI / 2; });
+    case 'shield': return t.lockedUntilTick > state.tick;
+    case 'nitro': return true;
+    default: return false;
+  }
+}
+
 /** Ordinary inputs only (ADR 007). Pure: returns the input and the next memory. */
 export function botInput(state: RaceState, slot: number, memory: BotMemory, track: Track, difficulty: Difficulty): [TruckInput, BotMemory] {
   const t = state.trucks[slot];
@@ -78,6 +92,7 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     right: err > STEER_DEADBAND,
     nitro: straight && !airborneOrSpun && t.nitros > 0,
     brake: straight && state.tick % 30 < BRAKE_TAP[difficulty],
+    item: wantsItem(state, t),
   };
   const queue = [...memory.queue, decided];
   const delay = DELAY[difficulty];
