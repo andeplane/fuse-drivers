@@ -4,6 +4,7 @@ import { applyRace, statsFor, type Series } from '../../shared/series.ts';
 import type { RaceEvent } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
 import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
+import { lerp } from '../../shared/truck.ts';
 import type { Track } from '../../shared/track.ts';
 import { createKeyboard } from '../input/keyboard.ts';
 import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
@@ -147,10 +148,15 @@ export class RaceScene extends Phaser.Scene {
       this.sprites[i].setTint(state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
       if (t.lockedUntilTick > state.tick && !t.respawnAtTick) this.drawLock(p.x, p.y);
     });
-    syncSet(this.missiles, state.missiles, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.missile).setScale(SPRITE_SCALE * 0.6).setDepth(9), (img, m) => img.setPosition(m.x, m.y).setRotation(m.heading + Math.PI / 2));
+    const prevMissiles = new Map(this.runner.previous.missiles.map((m) => [m.id, m]));
+    const alpha = this.runner.alpha;
+    syncSet(this.missiles, state.missiles, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.missile).setScale(SPRITE_SCALE * 0.6).setDepth(9), (img, m) => {
+      const p = prevMissiles.get(m.id) ?? m;
+      img.setPosition(lerp(p.x, m.x, alpha), lerp(p.y, m.y, alpha)).setRotation(m.heading + Math.PI / 2);
+    });
     syncSet(this.mines, state.mines, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.mineUnarmed).setScale(SPRITE_SCALE * 0.7).setDepth(3), (img, m) => img.setFrame(state.tick - m.droppedTick >= cfg.items.mine.armTicks && state.tick % 10 < 5 ? FRAMES.projectiles.mineArmed : FRAMES.projectiles.mineUnarmed));
     syncSet(this.oils, state.oils, (o) => this.add.image(o.x, o.y, 'projectiles', FRAMES.projectiles.oil).setScale((cfg.items.oil.radius * 2) / SPRITE_CELL).setDepth(2), (img, o) => img.setAlpha(Math.min(1, (cfg.items.oil.lifeTicks - (state.tick - o.droppedTick)) / 60)));
-    syncSet(this.drones, state.drones, () => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.drone).setScale(SPRITE_SCALE * 0.8).setDepth(13), (img, d) => { const p = dronePosition(d, state.trucks[d.owner], state.tick + this.runner.alpha); img.setPosition(p.x, p.y).setRotation(state.tick * 0.5); });
+    syncSet(this.drones, state.drones, () => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.drone).setScale(SPRITE_SCALE * 0.8).setDepth(13), (img, d) => { const p = dronePosition(d, { ...state.trucks[d.owner], ...poses[d.owner] }, state.tick + alpha); img.setPosition(p.x, p.y).setRotation(state.tick * 0.5); });
     this.boxes.forEach((b, i) => b.setAlpha(state.tick < state.boxCooldowns[i * state.trucks.length] ? 0.4 : 1));
   }
 
