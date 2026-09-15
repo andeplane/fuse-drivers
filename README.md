@@ -25,6 +25,17 @@ npm start               # builds, then serves game and party server on http://<y
 
 Open the printed address on the TV or laptop and press **P**. Phones on the same network scan the QR code (or open `/pad.html` and type the four-letter code) and become controllers; empty seats are bots. On the TV: left / right picks a track, **Space** a single race, **Enter** a five-race series. Between series races everyone shops on their phone. A phone that locks brakes its truck and gets its seat back when it reconnects; a reloaded TV rejoins its room. While developing, run `npm run server` next to `npm run dev`; the dev server forwards `/ws` to it. `PORT` changes the port.
 
+### Hosting online (M4)
+
+The party server is one Node process (ADR 008), so hosting is one container:
+
+```sh
+docker build -t fuse-drivers .
+docker run -p 8787:8787 fuse-drivers
+```
+
+Put it behind an HTTPS reverse proxy (Caddy, nginx, Fly.io, Render); pages served over HTTPS use `wss://` automatically. Sockets are only accepted from pages on the same host, messages are size- and rate-limited, and `/healthz` returns `{"ok":true,"rooms":N}` for the platform's health check. Room codes, host keys in the display link and seat tokens on phones already make reconnects and online play work; only the deployment itself is left.
+
 ## Develop
 
 ```sh
