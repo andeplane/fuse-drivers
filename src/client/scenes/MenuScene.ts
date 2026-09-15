@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { config } from '../../shared/config.ts';
 import { createSeries } from '../../shared/series.ts';
 import type { Track } from '../../shared/track.ts';
+import { partyLink } from '../net/party.ts';
 import { FONT } from './BootScene.ts';
 
 export class MenuScene extends Phaser.Scene {
@@ -24,5 +25,10 @@ export class MenuScene extends Phaser.Scene {
     // Ignore auto-repeat so a key still held from the previous scene does not skip this one.
     this.input.keyboard!.on('keydown-SPACE', (e: KeyboardEvent) => { if (!e.repeat) single(); });
     this.input.keyboard!.on('keydown-ENTER', (e: KeyboardEvent) => { if (!e.repeat) series(); });
+    this.add.text(width / 2, height * 0.7, 'P: PARTY ON THIS SCREEN  ·  PHONES ARE THE CONTROLLERS', { ...FONT, fontSize: '30px', color: '#ffd23f' }).setOrigin(0.5);
+    const party = () => this.scene.start('Lobby', { link: partyLink(this.game, data.tracks) });
+    this.input.keyboard!.on('keydown-P', (e: KeyboardEvent) => { if (!e.repeat) party(); });
+    // A reloaded party display carries its host key in the hash and rejoins its room.
+    if (location.hash.includes('host=')) party();
   }
 }

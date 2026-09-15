@@ -17,6 +17,14 @@ Controls: arrows or **A / D** steer, **S** brake, **Shift** nitro, **Space** use
 
 Sound is synthesized in the browser (no audio files) and starts on the first key press; **M** toggles mute and is remembered.
 
+### Party on a TV (phones as controllers)
+
+```sh
+npm start               # builds, then serves game and party server on http://<your LAN address>:8787
+```
+
+Open the printed address on the TV or laptop and press **P**. Phones on the same network scan the QR code (or open `/pad.html` and type the four-letter code) and become controllers; empty seats are bots. On the TV: left / right picks a track, **Space** a single race, **Enter** a five-race series. Between series races everyone shops on their phone. A phone that locks brakes its truck and gets its seat back when it reconnects; a reloaded TV rejoins its room. While developing, run `npm run server` next to `npm run dev`; the dev server forwards `/ws` to it. `PORT` changes the port.
+
 ## Develop
 
 ```sh

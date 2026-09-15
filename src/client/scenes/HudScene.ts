@@ -50,7 +50,8 @@ export class HudScene extends Phaser.Scene {
       const x = 170 + i * (chipW + 6);
       this.panel(TRUCK_COLORS[i], x, TOP, chipW, TOP_H);
       this.add.image(x + 32, TOP + TOP_H / 2, 'portraits', i).setScale(46 / HUD_CELL.portraits);
-      this.add.text(x + 60, TOP + 12, i === 0 ? 'YOU' : `CPU${i}`, { ...LABEL, color: '#ffffff' });
+      const party = this.race.party;
+      this.add.text(x + 60, TOP + 12, party ? (party.names[i] ?? `CPU${i}`).slice(0, 8).toUpperCase() : i === 0 ? 'YOU' : `CPU${i}`, { ...LABEL, color: '#ffffff' });
       return this.pips(x + 60, TOP + 44, t.stats.maxArmor, 14, 1, 2 * i);
     });
     const px = 170 + s.trucks.length * (chipW + 6);
@@ -81,9 +82,18 @@ export class HudScene extends Phaser.Scene {
     this.events.once('shutdown', () => this.game.events.off('race-event', this.onEvent, this));
   }
 
+  /** The truck the personal panels follow: you in single-player, the leader on a party TV. */
+  private get focus() { return this.race.party ? this.race.runner.state.placements[0] : 0; }
+
   private onEvent(e: RaceEvent) {
+    const party = this.race.party;
     if (e.type === 'start') this.flash(FRAMES.countdown.go);
-    if (e.type === 'lap' && e.slot === 0) this.flash(e.lap >= config.laps ? FRAMES.countdown.finish : `LAP ${e.lap + 1}`);
+    if (e.type === 'lap' && e.slot === this.focus) this.flash(e.lap >= config.laps ? FRAMES.countdown.finish : `LAP ${e.lap + 1}`);
+    if (party) {
+      const name = (slot: number) => (party.names[slot] ?? `CPU${slot}`).toUpperCase();
+      if (e.type === 'kill' && e.by >= 0 && e.by !== e.slot) this.flash(`${name(e.by)} WRECKS ${name(e.slot)}`);
+      return;
+    }
     if (e.type === 'wrongWay' && e.slot === 0) this.flash('WRONG WAY');
     if (e.type === 'kill' && e.slot === 0) this.flash('WRECKED');
     if (e.type === 'kill' && e.by === 0 && e.slot !== 0) this.flash('KILL!');
@@ -107,9 +117,10 @@ export class HudScene extends Phaser.Scene {
 
   update() {
     const s = this.race.runner.state;
-    const me = s.trucks[0];
+    const focus = this.focus;
+    const me = s.trucks[focus];
     this.lap.setText(`${Math.min(me.laps + 1, config.laps)}/${config.laps}`);
-    this.pos.setText(`${s.placements.indexOf(0) + 1}/${s.trucks.length}`);
+    this.pos.setText(`${s.placements.indexOf(focus) + 1}/${s.trucks.length}`);
     this.kills.setText(String(me.kills));
     const secs = Math.max(0, (s.tick - s.countdownEndTick) / TICK_RATE);
     this.clock.setText(`${Math.floor(secs / 60)}:${(secs % 60).toFixed(1).padStart(4, '0')}`);
@@ -122,6 +133,6 @@ export class HudScene extends Phaser.Scene {
       const left = Math.ceil((s.countdownEndTick - s.tick) / TICK_RATE);
       this.show(Math.max(0, Math.min(2, 3 - left)));
     }
-    if (me.laps >= config.laps) this.badge.setFrame((this.race.final ?? s).placements.indexOf(0)).setVisible(true);
+    if (me.laps >= config.laps) this.badge.setFrame((this.race.final ?? s).placements.indexOf(focus)).setVisible(true);
   }
 }

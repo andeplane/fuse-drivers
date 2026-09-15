@@ -7,6 +7,7 @@ import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
 import { lerp } from '../../shared/truck.ts';
 import type { Segment, Track } from '../../shared/track.ts';
 import { createKeyboard } from '../input/keyboard.ts';
+import type { PartyData } from '../net/party.ts';
 import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
 import { FRAMES, SPRITE_CELL, TILE_PX, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
 
@@ -74,11 +75,15 @@ export class RaceScene extends Phaser.Scene {
   series!: Series;
   tracks!: Record<string, Track>;
 
+  /** Set when the race runs on the party server: the runner replays its snapshots and inputs come from phones. */
+  party?: PartyData;
+
   constructor() { super('Race'); }
 
-  create(data: SeriesData) {
+  create(data: SeriesData & { party?: PartyData }) {
     this.series = data.series;
     this.tracks = data.tracks;
+    this.party = data.party;
     this.track = data.tracks[data.series.tracks[data.series.raceIndex]];
     this.final = undefined;
     this.missiles.clear();
@@ -86,7 +91,7 @@ export class RaceScene extends Phaser.Scene {
     this.oils.clear();
     this.drones.clear();
     const bots = Object.fromEntries(BOT_LEVELS.map((d, i) => [i + 1, d]));
-    this.runner = createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
+    this.runner = data.party?.runner ?? createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
     this.readInput = createKeyboard(this);
     this.drawTrack();
     this.trails.clear();
@@ -166,7 +171,8 @@ export class RaceScene extends Phaser.Scene {
     const { state, events } = this.runner.advance(delta, [this.readInput()]);
     if (state.phase === 'finished' && !this.final) {
       const final = (this.final = state);
-      this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: final, series: applyRace(this.series, final), tracks: this.tracks }); });
+      // A party race moves on when the server sends the results.
+      if (!this.party) this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: final, series: applyRace(this.series, final), tracks: this.tracks }); });
     }
     for (const e of events) {
       this.game.events.emit('race-event', e satisfies RaceEvent);
