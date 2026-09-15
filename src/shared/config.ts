@@ -4,7 +4,8 @@ export const DT = 1 / TICK_RATE;
 export const TICK_MS = 1000 / TICK_RATE;
 const deg = (d: number) => (d * Math.PI) / 180;
 
-export type SurfaceKind = 'dirt' | 'tarmac' | 'mud' | 'water' | 'oil' | 'boost' | 'toxic' | 'mogul' | 'ramp';
+export const SURFACE_KINDS = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp'] as const;
+export type SurfaceKind = (typeof SURFACE_KINDS)[number];
 
 export interface SurfaceRule { speed: number; turnMul: number; drift: boolean }
 

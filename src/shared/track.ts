@@ -1,4 +1,4 @@
-import { config, type SurfaceKind } from './config.ts';
+import { config, SURFACE_KINDS, type SurfaceKind } from './config.ts';
 
 export interface Point { x: number; y: number }
 export interface Segment { a: Point; b: Point }
@@ -20,8 +20,6 @@ export interface Track {
   items: Point[];
 }
 
-const SURFACE_KINDS: SurfaceKind[] = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp'];
-
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => typeof v === 'object' && v !== null;
 const num = (v: unknown, what: string): number => {
@@ -41,9 +39,12 @@ function points(obj: Json, key: 'polyline' | 'polygon'): Point[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const ox = num(obj.x, 'object x');
   const oy = num(obj.y, 'object y');
+  const rot = (num(obj.rotation ?? 0, 'object rotation') * Math.PI) / 180;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
   return raw.map((p, i) => {
     if (!isObj(p)) throw new Error(`track: bad ${key} point ${i}`);
-    return { x: ox + num(p.x, 'point x'), y: oy + num(p.y, 'point y') };
+    const x = num(p.x, 'point x'), y = num(p.y, 'point y');
+    return { x: ox + x * cos - y * sin, y: oy + x * sin + y * cos };
   });
 }
 
@@ -59,13 +60,14 @@ export function parseTrack(input: unknown, name = 'track'): Track {
   const cols = num(input.width, 'width');
   const rows = num(input.height, 'height');
   const tile = num(input.tilewidth, 'tilewidth');
-  if (tile !== config.tile) throw new Error(`track: tilewidth must be ${config.tile}`);
+  if (tile !== config.tile || input.tileheight !== config.tile) throw new Error(`track: tile size must be ${config.tile}`);
+  if (cols * tile !== config.world.width || rows * tile !== config.world.height - 4) throw new Error(`track: map must be ${config.world.width / config.tile}x${(config.world.height - 4) / config.tile} tiles`);
 
   const gidToSurface = new Map<number, SurfaceKind>();
   for (const ts of Array.isArray(input.tilesets) ? (input.tilesets as unknown[]) : []) {
-    if (!isObj(ts) || !Array.isArray(ts.tiles)) throw new Error('track: tilesets must be embedded');
+    if (!isObj(ts) || typeof ts.source === 'string') throw new Error('track: tilesets must be embedded');
     const first = num(ts.firstgid, 'firstgid');
-    for (const t of ts.tiles as unknown[]) {
+    for (const t of Array.isArray(ts.tiles) ? (ts.tiles as unknown[]) : []) {
       if (!isObj(t)) continue;
       const props = Array.isArray(t.properties) ? (t.properties as unknown[]) : [];
       const sp = props.find((p): p is Json => isObj(p) && p.name === 'surface');
@@ -79,7 +81,7 @@ export function parseTrack(input: unknown, name = 'track'): Track {
   const data = surfaceLayer.data;
   if (!Array.isArray(data) || data.length !== cols * rows) throw new Error('track: surface layer data size mismatch');
   const surface = (data as unknown[]).map((gid, i) => {
-    const g = num(gid, `surface gid ${i}`);
+    const g = num(gid, `surface gid ${i}`) & 0x1fffffff;
     if (g === 0) return null;
     const s = gidToSurface.get(g);
     if (!s) throw new Error(`track: surface gid ${g} has no surface property`);
@@ -100,17 +102,22 @@ export function parseTrack(input: unknown, name = 'track'): Track {
     return { a: pts[0], b: pts[1], mid: { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } };
   });
   if (checkpoints.length < 2) throw new Error('track: need at least two checkpoints');
+  checkpoints.forEach((c, i) => {
+    if (Math.hypot(c.b.x - c.a.x, c.b.y - c.a.y) < 1) throw new Error(`track: checkpoint ${i} is zero-length`);
+    const prev = checkpoints[(i - 1 + checkpoints.length) % checkpoints.length];
+    if (Math.hypot(c.mid.x - prev.mid.x, c.mid.y - prev.mid.y) < 1) throw new Error(`track: checkpoints ${i} and its predecessor coincide`);
+  });
 
-  const spawns = objects(input, 'spawns', true).map((o) => ({
-    x: num(o.x, 'spawn x'),
-    y: num(o.y, 'spawn y'),
-    heading: ((typeof o.rotation === 'number' ? o.rotation : 0) * Math.PI) / 180,
-  }));
-  if (spawns.length < 5) throw new Error('track: need five spawns');
+  const spawns = objects(input, 'spawns', true).map((o) => {
+    if (o.point !== true) throw new Error('track: spawns must be point objects');
+    return { x: num(o.x, 'spawn x'), y: num(o.y, 'spawn y'), heading: (num(o.rotation ?? 0, 'spawn rotation') * Math.PI) / 180 };
+  });
+  if (spawns.length !== 5) throw new Error('track: need exactly five spawns');
 
-  const wp = objects(input, 'waypoints', true)[0];
-  const waypoints = wp ? points(wp, 'polygon') ?? points(wp, 'polyline') : undefined;
-  if (!waypoints || waypoints.length < 3) throw new Error('track: waypoints must be one polygon');
+  const wps = objects(input, 'waypoints', true);
+  if (wps.length !== 1) throw new Error('track: waypoints must contain exactly one polygon');
+  const waypoints = points(wps[0], 'polygon');
+  if (!waypoints || waypoints.length < 3) throw new Error('track: waypoints must be one closed polygon');
 
   const items = objects(input, 'items', false).map((o) => ({ x: num(o.x, 'item x'), y: num(o.y, 'item y') }));
 

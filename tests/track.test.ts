@@ -28,7 +28,7 @@ test('rejects a map missing a required layer, naming it', () => {
 
 test('rejects an external tileset and an unknown surface', () => {
   const j = json();
-  delete j.tilesets[0].tiles;
+  j.tilesets[0].source = 'surfaces.tsx';
   assert.throws(() => parseTrack(j), /embedded/);
   const k = json();
   k.tilesets[0].tiles[0].properties[0].value = 'lava';

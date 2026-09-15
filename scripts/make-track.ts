@@ -5,8 +5,7 @@
 import { writeFileSync } from 'node:fs';
 
 const TILE = 32, COLS = 50, ROWS = 28, HALF_WIDTH = 45;
-const SURFACES = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp'] as const;
-type Surface = (typeof SURFACES)[number];
+import { SURFACE_KINDS as SURFACES, type SurfaceKind as Surface } from '../src/shared/config.ts';
 type P = { x: number; y: number };
 
 interface Zone { surface: Surface; test: (p: P) => boolean }
@@ -39,9 +38,9 @@ const refinery: TrackDef = {
     { surface: 'ramp', test: inRect(1420, 620, 1540, 660) },
     { surface: 'mogul', test: (p) => p.y > 130 && p.y < 230 && [700, 780, 860, 940].some((x) => Math.abs(p.x - x) < 16) },
     { surface: 'toxic', test: inCircle({ x: 1330, y: 540 }, 60) },
-    { surface: 'toxic', test: inCircle({ x: 270, y: 560 }, 60) },
+    { surface: 'toxic', test: inCircle({ x: 200, y: 560 }, 60) },
   ],
-  items: [{ x: 450, y: 150 }, { x: 450, y: 180 }, { x: 450, y: 210 }],
+  items: [{ x: 550, y: 150 }, { x: 550, y: 180 }, { x: 550, y: 210 }],
 };
 
 function catmullRom(pts: P[], perSegment: number): P[] {
