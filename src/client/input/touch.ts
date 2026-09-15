@@ -1,12 +1,19 @@
 import { NEUTRAL_INPUT, type TruckInput } from '../../shared/input.ts';
 
 const CSS = `
-.fd-touch{position:fixed;inset:0;display:grid;gap:10px;padding:12px;box-sizing:border-box;pointer-events:none;z-index:10;
+.fd-touch{position:fixed;inset:0;display:grid;gap:12px;padding:14px;box-sizing:border-box;pointer-events:none;z-index:10;
   grid-template-columns:1fr 1fr 1.4fr 1fr 1fr;grid-template-rows:1fr 1fr;grid-template-areas:"l r . n i" "l r . b a"}
-.fd-touch.overlay{grid-template-rows:3fr 1fr 1fr;grid-template-areas:". . . . ." "l r . n i" "l r . b a";opacity:.8}
+.fd-touch.overlay{grid-template-rows:3fr 1fr 1fr;grid-template-areas:". . . . ." "l r . n i" "l r . b a";opacity:.85}
 .fd-touch button{pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
-  border:4px solid #000;border-radius:18px;font:bold clamp(14px,4vmin,28px) monospace;color:#fff;background:rgba(40,40,48,.6)}
-.fd-touch button.on{background:#ffd23f;color:#000}
+  border:4px solid #000;border-radius:16px;font:900 clamp(15px,4.5vmin,34px) Impact,'Arial Black',monospace;letter-spacing:.04em;color:#fff;
+  text-shadow:3px 3px 0 #000;box-shadow:inset 0 5px 0 rgba(255,255,255,.35),inset 0 -8px 0 rgba(0,0,0,.35),0 6px 0 #000;
+  transition:transform 40ms,box-shadow 40ms}
+.fd-touch button[data-key=left],.fd-touch button[data-key=right]{background:linear-gradient(#6c6f7a,#3a3c44);font-size:clamp(28px,11vmin,80px)}
+.fd-touch button[data-key=nitro]{background:linear-gradient(#5ff0ff,#1596b8)}
+.fd-touch button[data-key=item]{background:linear-gradient(#c77dff,#6a2bb8)}
+.fd-touch button[data-key=itemAlt]{background:linear-gradient(#9a6be0,#4a2386)}
+.fd-touch button[data-key=brake]{background:linear-gradient(#ff6a5a,#b3201a)}
+.fd-touch button.on{transform:translateY(5px);box-shadow:inset 0 3px 0 rgba(255,255,255,.2),inset 0 -3px 0 rgba(0,0,0,.4),0 1px 0 #000;filter:brightness(1.35)}
 @media (orientation:portrait){
   .fd-touch{grid-template-columns:1fr 1fr;grid-template-rows:2fr 1fr 1fr;grid-template-areas:"l r" "n i" "b a"}
   .fd-touch.overlay{grid-template-columns:1fr 1fr 1fr 1fr;grid-template-rows:4fr 1.4fr 1fr;grid-template-areas:". . . ." "l l r r" "b n i a"}
