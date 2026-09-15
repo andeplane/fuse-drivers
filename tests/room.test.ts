@@ -47,6 +47,14 @@ test('a reconnect with its token resumes the same seat', () => {
   assert.deepEqual(seatInputs(r3, 60)[1], NEUTRAL_INPUT);
 });
 
+test('a phone that reloads mid-race drives again from sequence 0', () => {
+  let [room, seat] = joinRoom(createRoom('ABCD'), undefined, 'token0001', undefined, 0);
+  for (let seq = 0; seq < 500; seq++) room = applyInput(room, seat!.slot, seq, LEFT, seq);
+  [room] = joinRoom(disconnectSeat(room, seat!.slot), 'token0001', 'unused001', undefined, 600);
+  room = applyInput(room, seat!.slot, 0, RIGHT, 601);
+  assert.deepEqual(seatInputs(room, 601)[seat!.slot], RIGHT);
+});
+
 test('socket messages are validated strictly', () => {
   assert.deepEqual(parseClientMessage('{"t":"input","seq":3,"input":{"left":true,"right":false,"brake":false,"nitro":false,"item":false,"itemAlt":false,"extra":1}}'), { t: 'input', seq: 3, input: LEFT });
   assert.equal(parseClientMessage('{"t":"input","seq":3,"input":{"left":1}}'), null);

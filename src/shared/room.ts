@@ -80,7 +80,8 @@ export const createRoom = (code: string): Room => ({ code, seats: [] });
 export function joinRoom(room: Room, token: string | undefined, newToken: string, name: string | undefined, tick: number): [Room, Seat | null] {
   const existing = token ? room.seats.find((s) => s.token === token) : undefined;
   if (existing) {
-    const seat = { ...existing, connected: true, inputTick: tick, input: NEUTRAL_INPUT, name: name ?? existing.name };
+    // A reloaded phone counts its input sequence from 0 again, so the resumed seat accepts any sequence.
+    const seat = { ...existing, connected: true, inputTick: tick, input: NEUTRAL_INPUT, seq: -1, name: name ?? existing.name };
     return [{ ...room, seats: room.seats.map((s) => (s.slot === seat.slot ? seat : s)) }, seat];
   }
   const taken = new Set(room.seats.map((s) => s.slot));
