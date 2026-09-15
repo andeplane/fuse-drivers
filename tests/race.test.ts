@@ -93,6 +93,17 @@ test('a truck driven along the waypoints completes laps in order and finishes', 
   assert.ok(s.trucks[0].finishedTick > 0);
 });
 
+test('landing on another truck spins it out without damage', () => {
+  let s: RaceState = { ...createRace(track, 1, [BASE_STATS, BASE_STATS]), phase: 'racing', tick: 100 };
+  const lander = { ...s.trucks[0], x: 900, y: 830, heading: 0, speed: 300, airborneUntilTick: 101, landAtTick: 101 };
+  const victim = { ...s.trucks[1], x: 915, y: 830, heading: 0, speed: 300 };
+  s = { ...s, trucks: [lander, victim] };
+  const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
+  assert.ok(r.state.trucks[1].spinUntilTick > r.state.tick);
+  assert.equal(r.state.trucks[1].armor, victim.armor);
+  assert.ok(r.events.some((e) => e.type === 'hit' && e.item === 'landing'));
+});
+
 test('runner is frame-rate independent and bounds catch-up', () => {
   const inputs = [{ ...NEUTRAL_INPUT, right: true }];
   const a = createRaceRunner(track, 3);

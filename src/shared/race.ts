@@ -40,7 +40,7 @@ export type RaceEvent =
   | { tick: number; type: 'start' }
   | { tick: number; type: 'pickup'; slot: number; item: ItemKind }
   | { tick: number; type: 'fire'; slot: number; item: ItemKind }
-  | { tick: number; type: 'hit'; slot: number; by: number; item: ItemKind; absorbed: boolean }
+  | { tick: number; type: 'hit'; slot: number; by: number; item: ItemKind | 'landing'; absorbed: boolean }
   | { tick: number; type: 'kill'; slot: number; by: number };
 
 export interface StepResult { state: RaceState; events: RaceEvent[] }
@@ -307,6 +307,17 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   trucks = trucks.map((t) => (t.lockedUntilTick && !missiles.some((m) => m.target === t.slot) ? { ...t, lockedUntilTick: 0 } : t));
 
   trucks = trucks.map((t) => (parked(t) ? t : applySurface(t, track, tick, events, oils)));
+  // Landing within 28 u of another truck spins that truck out (ADR 004).
+  const landers = trucks.filter((t) => !parked(t) && prev[t.slot].landAtTick === tick);
+  if (landers.length) {
+    trucks = trucks.map((o) => {
+      if (parked(o) || tick < o.invulnerableUntilTick || tick < o.spinUntilTick) return o;
+      const hit = landers.some((l) => l.slot !== o.slot && l.onBridge === o.onBridge && Math.hypot(l.x - o.x, l.y - o.y) <= config.truck.landingSpinRadius + 0.5);
+      if (!hit) return o;
+      events.push({ tick, type: 'hit', slot: o.slot, by: -1, item: 'landing', absorbed: false });
+      return { ...o, spinUntilTick: tick + config.truck.spinOutTicks, speed: o.speed * config.truck.spinOutSpeedMul, driftDir: 0, driftTicks: 0 };
+    });
+  }
 
   // Step 6: item boxes, rolled in slot order; boxes are never consumed, each truck has a per-box cooldown.
   const boxCooldowns = state.boxCooldowns.slice();
