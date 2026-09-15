@@ -1,5 +1,5 @@
 import { BASE_STATS, config, type TruckStats } from './config.ts';
-import { closestOnSegment, crosses } from './geometry.ts';
+import { closestOnSegment, crosses, reaches } from './geometry.ts';
 import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import { applyHit, rollItem, stepDrones, stepMines, stepMissiles, useItem, type Drone, type Hit, type Mine, type Missile, type OilSlick } from './items.ts';
 import { createTruck, stepTruck, wrapAngle, type ItemKind, type Truck } from './truck.ts';
@@ -184,7 +184,7 @@ function applyCheckpoints(prev: Truck, t: Truck, track: Track, tick: number, eve
   let n2 = t;
   if (!t.finishedTick) {
     const cp = track.checkpoints[t.checkpoint];
-    if (crosses({ x: prev.x, y: prev.y }, { x: t.x, y: t.y }, cp)) {
+    if (reaches({ x: prev.x, y: prev.y }, { x: t.x, y: t.y }, cp)) {
       if (t.checkpoint === n - 1) {
         const laps = t.laps + 1;
         n2 = { ...t, laps, checkpoint: 0 };

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { BASE_STATS, config, TICK_MS } from '../src/shared/config.ts';
 import { NEUTRAL_INPUT, type TruckInput } from '../src/shared/input.ts';
+import { reaches } from '../src/shared/geometry.ts';
 import { createRace, crosses, step, type RaceState } from '../src/shared/race.ts';
 import { createRaceRunner } from '../src/shared/runner.ts';
 import { parseTrack } from '../src/shared/track.ts';
@@ -56,6 +57,15 @@ test('crosses detects segment intersection in either direction', () => {
   assert.ok(crosses({ x: -1, y: 0 }, { x: 1, y: 0 }, seg));
   assert.ok(crosses({ x: 1, y: 0 }, { x: -1, y: 0 }, seg));
   assert.ok(!crosses({ x: 1, y: 0 }, { x: 2, y: 0 }, seg));
+});
+
+test('reaches counts a move that stops exactly on a checkpoint once', () => {
+  const line = { a: { x: 0, y: -1 }, b: { x: 0, y: 1 } };
+  // A wall slide left a bot exactly on the refinery.reverse finish line; strict crossing missed the lap.
+  assert.ok(reaches({ x: 2, y: 0 }, { x: 0, y: 0 }, line));
+  assert.ok(!reaches({ x: 0, y: 0 }, { x: -2, y: 0 }, line));
+  assert.ok(reaches({ x: 2, y: 0 }, { x: -2, y: 0 }, line));
+  assert.ok(!reaches({ x: 2, y: 0 }, { x: 1, y: 0 }, line));
 });
 
 test('walls keep a truck on the track and penalise contact', () => {
