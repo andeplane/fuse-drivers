@@ -64,17 +64,22 @@ def bands(mask, axis):
     if start is not None: out.append((start, len(proj)))
     return out
 
-def split_sheet(name, group, cell, min_size=12):
-    """Split a raw sheet into sprites by transparent gaps, row by row, and lay them out on a uniform-cell strip."""
+def crops(name, group, min_size=12):
+    """Sprites of a raw sheet found by transparent gaps, row by row, at source resolution."""
     import numpy as np
     im = Image.open(RAW / group / f'{name}.png').convert('RGBA')
     a = np.array(im)[:, :, 3] > 32
-    sprites = []
+    out = []
     for (y0, y1) in bands(a, 1):
         if y1 - y0 < min_size: continue
         for (x0, x1) in bands(a[y0:y1], 0):
             if x1 - x0 < min_size: continue
-            sprites.append(fit(im.crop((x0, y0, x1, y1)), cell))
+            out.append(im.crop((x0, y0, x1, y1)))
+    return out
+
+def split_sheet(name, group, cell):
+    """Lay a raw sheet's sprites out on a uniform-cell strip."""
+    sprites = [fit(c, cell) for c in crops(name, group)]
     strip = Image.new('RGBA', (cell * len(sprites), cell), (0, 0, 0, 0))
     for i, sp in enumerate(sprites): strip.paste(sp, (i * cell, 0))
     strip.save(OUT / f'{name}.png')
@@ -82,4 +87,11 @@ def split_sheet(name, group, cell, min_size=12):
 
 counts = {name: split_sheet(name, 'items', 128) for name in ['itembox', 'icons', 'projectiles', 'explosion', 'markers', 'dust']}
 print('item sheets (sprites per strip):', counts)
+
+# HUD (assets/raw/hud/README.md). Strips: portraits 6, bars 16 (lit/unlit pairs), countdown 6, placements 5, logo 2.
+counts = {name: split_sheet(name, 'hud', cell) for name, cell in [('portraits', 128), ('bars', 64), ('countdown', 640), ('placements', 256), ('logo', 768)]}
+print('hud sheets (sprites per strip):', counts)
+# Panels keep their own proportions for 9-slice: half source size, one file each.
+for color, im in zip(['grey', 'cyan', 'pink', 'lime', 'orange', 'violet', 'gold', 'bar'], crops('panels', 'hud')):
+    im = im.crop(im.getbbox()); im.resize((im.width // 2, im.height // 2), Image.LANCZOS).save(OUT / f'panel-{color}.png')
 print('built', sorted(p.name for p in OUT.iterdir()))
