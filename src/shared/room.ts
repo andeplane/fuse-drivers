@@ -96,6 +96,9 @@ export function disconnectSeat(room: Room, slot: number): Room {
   return { ...room, seats: room.seats.map((s) => (s.slot === slot ? { ...s, connected: false, input: NEUTRAL_INPUT } : s)) };
 }
 
+/** A controller left while the room is still in its lobby: the seat is freed so ghosts and private-mode reloads do not fill the room. */
+export const leaveSeat = (room: Room, slot: number): Room => ({ ...room, seats: room.seats.filter((s) => s.slot !== slot) });
+
 /** Latest input wins; duplicated and reordered (older sequence) inputs are dropped. */
 export function applyInput(room: Room, slot: number, seq: number, input: TruckInput, tick: number): Room {
   return { ...room, seats: room.seats.map((s) => (s.slot === slot && seq > s.seq ? { ...s, seq, input, inputTick: tick } : s)) };

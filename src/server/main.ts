@@ -11,7 +11,7 @@ import { randomBytes } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { BOT_LEVELS, TICK_MS } from '../shared/config.ts';
 import type { RaceEvent, RaceState } from '../shared/race.ts';
-import { applyInput, createRoom, disconnectSeat, joinRoom, parseClientMessage, seatInputs, setReady, type Room } from '../shared/room.ts';
+import { applyInput, createRoom, disconnectSeat, joinRoom, leaveSeat, parseClientMessage, seatInputs, setReady, type Room } from '../shared/room.ts';
 import { createRaceRunner, type RaceRunner } from '../shared/runner.ts';
 import { applyRace, botShop, buy, createSeries, statsFor, type Series } from '../shared/series.ts';
 import { parseTrack, type Track } from '../shared/track.ts';
@@ -236,7 +236,8 @@ wss.on('connection', (ws) => {
     if (role === 'host') party.hosts.delete(ws);
     if (role === 'pad' && party.pads.get(ws) === slot) {
       party.pads.delete(ws);
-      party.room = disconnectSeat(party.room, slot);
+      // In the lobby a leaving phone frees its seat; once racing, the seat is kept for a reconnect.
+      party.room = party.phase === 'lobby' ? leaveSeat(party.room, slot) : disconnectSeat(party.room, slot);
       syncSeats(party);
     }
   });

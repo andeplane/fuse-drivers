@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NEUTRAL_INPUT } from '../src/shared/input.ts';
-import { applyInput, createRoom, disconnectSeat, joinRoom, MAX_SEATS, parseClientMessage, seatInputs, STALE_INPUT_TICKS } from '../src/shared/room.ts';
+import { applyInput, createRoom, disconnectSeat, joinRoom, leaveSeat, MAX_SEATS, parseClientMessage, seatInputs, STALE_INPUT_TICKS } from '../src/shared/room.ts';
 
 const LEFT = { ...NEUTRAL_INPUT, left: true };
 const RIGHT = { ...NEUTRAL_INPUT, right: true };
@@ -53,6 +53,16 @@ test('a phone that reloads mid-race drives again from sequence 0', () => {
   [room] = joinRoom(disconnectSeat(room, seat!.slot), 'token0001', 'unused001', undefined, 600);
   room = applyInput(room, seat!.slot, 0, RIGHT, 601);
   assert.deepEqual(seatInputs(room, 601)[seat!.slot], RIGHT);
+});
+
+test('a seat left in the lobby is freed for the next phone', () => {
+  let room = createRoom('ABCD');
+  [room] = joinRoom(room, undefined, 'first0001', undefined, 0);
+  [room] = joinRoom(room, undefined, 'second001', undefined, 0);
+  room = leaveSeat(room, 0);
+  const [next, seat] = joinRoom(room, undefined, 'third0001', undefined, 5);
+  assert.equal(seat?.slot, 0);
+  assert.equal(next.seats.length, 2);
 });
 
 test('socket messages are validated strictly', () => {
