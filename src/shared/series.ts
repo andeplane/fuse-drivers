@@ -19,9 +19,13 @@ const deg = (d: number) => (d * Math.PI) / 180;
 export interface Driver {
   slot: number;
   money: number;
+  /** Lifetime prize money, the tie-break (ADR 006); `money` is what is left to spend. */
+  earned: number;
   points: number;
   kills: number;
   deaths: number;
+  lapsLed: number;
+  nitrosUsed: number;
   levels: Record<UpgradeKind, number>;
 }
 
@@ -56,7 +60,7 @@ export function createSeries(trackNames: string[], slots: number, seed: number, 
     rng = next;
     tracks.push(pool.splice(Math.floor(r * pool.length), 1)[0]);
   }
-  return { raceIndex: 0, tracks, drivers: Array.from({ length: slots }, (_, slot) => ({ slot, money: 0, points: 0, kills: 0, deaths: 0, levels: { ...NO_LEVELS } })) };
+  return { raceIndex: 0, tracks, drivers: Array.from({ length: slots }, (_, slot) => ({ slot, money: 0, earned: 0, points: 0, kills: 0, deaths: 0, lapsLed: 0, nitrosUsed: 0, levels: { ...NO_LEVELS } })) };
 }
 
 /** Prize money and points from a finished race, by placement (ADR 006). */
@@ -64,7 +68,8 @@ export function applyRace(series: Series, state: RaceState): Series {
   const drivers = series.drivers.map((d) => {
     const place = state.placements.indexOf(d.slot);
     const t = state.trucks[d.slot];
-    return { ...d, points: d.points + (config.points[place] ?? 0), money: d.money + (config.prize[place] ?? 0) + t.kills * config.killBonus, kills: d.kills + t.kills, deaths: d.deaths + t.deaths };
+    const prize = (config.prize[place] ?? 0) + t.kills * config.killBonus;
+    return { ...d, points: d.points + (config.points[place] ?? 0), money: d.money + prize, earned: d.earned + prize, kills: d.kills + t.kills, deaths: d.deaths + t.deaths, lapsLed: d.lapsLed + t.lapsLed, nitrosUsed: d.nitrosUsed + t.nitrosUsed };
   });
   return { ...series, raceIndex: series.raceIndex + 1, drivers };
 }
@@ -81,20 +86,17 @@ export function buy(d: Driver, kind: UpgradeKind): Driver | null {
   return { ...d, money: d.money - c, levels: { ...d.levels, [kind]: d.levels[kind] + 1 } };
 }
 
-/** Bots buy the cheapest affordable upgrade in round-robin order until nothing is affordable (ADR 007). */
+/** Bots buy the cheapest affordable upgrade, ties in row order, until nothing is affordable (ADR 006). */
 export function botShop(d: Driver): Driver {
   let cur = d;
-  let idle = 0;
-  let i = 0;
-  while (idle < ORDER.length) {
-    const next = buy(cur, ORDER[i % ORDER.length]);
-    if (next) { cur = next; idle = 0; } else idle++;
-    i++;
+  for (;;) {
+    const options = ORDER.map((k) => ({ k, c: cost(cur, k) })).filter((o): o is { k: UpgradeKind; c: number } => o.c !== null && o.c <= cur.money).sort((a, b) => a.c - b.c);
+    if (!options.length) return cur;
+    cur = buy(cur, options[0].k)!;
   }
-  return cur;
 }
 
-/** Standings: points desc, then money desc, then slot. */
+/** Standings: points desc, then money earned desc, then slot. */
 export function standings(series: Series): Driver[] {
-  return series.drivers.slice().sort((a, b) => b.points - a.points || b.money - a.money || a.slot - b.slot);
+  return series.drivers.slice().sort((a, b) => b.points - a.points || b.earned - a.earned || a.slot - b.slot);
 }

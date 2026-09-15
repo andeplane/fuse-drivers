@@ -24,7 +24,7 @@ Mario Kart's items are what turn a racing game into a party game: the leader is 
 - `item` uses the item in its default direction: mine and oil backward, missile forward. `item` with `itemAlt` held uses the opposite direction. Shield, nitro refill, drone and EMP ignore `itemAlt`.
 - **Missile**: target is the nearest truck within 600 u whose bearing is within ±45° of the owner's heading at launch; no retargeting; no target means dumb-fire. Speed 600 u/s, turn 200°/s, 4 s lifetime, r = 6, destroyed on wall contact, hits the first non-owner non-invulnerable unfinished truck whose circle its swept path touches, cannot hit for its first 10 ticks. The target's `lockedUntilTick` is set at launch for the missile's lifetime. Backward: dumb-fire. Hit: 1 damage and spin-out.
 - **Mine**: dropped 30 u behind, or lobbed 200 u forward (M2). Armed after 0.5 s, lasts 20 s, visible. Trigger radius 20 plus the truck radius, centre to centre. Hit: 1 damage and spin-out. Owner is not immune.
-- **Oil slick (M2)**: 3×3 tiles of oil for 15 s, overriding the surface.
+- **Oil slick (M2)**: a circle of radius 48 u for 15 s that applies the oil effect on top of whatever tile is there; ramps, pads and toxic keep working underneath.
 - **Drone (M2)**: orbits the owner at r = 60 for 8 s or 3 zaps, whichever first. Any other truck within 80 u takes 1 damage, at most once per second per truck. No spin-out.
 - **Shield**: 6 s. Any blocked effect (missile, mine, drone zap, EMP) consumes the shield and destroys the effect. Does not block toxic damage or landing spin-out.
 - **EMP (M2)**: every other truck within 250 u loses steering for 1 s and loses its held item. No damage. Shield blocks it.

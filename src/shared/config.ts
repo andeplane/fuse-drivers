@@ -89,7 +89,7 @@ export const config = {
     mine: { dropBehind: 30, lobAhead: 200, armTicks: 15, lifeTicks: 600, radius: 20 },
     shieldTicks: 180,
     nitroRefill: 2,
-    drone: { radius: 60, range: 80, lifeTicks: 240, maxZaps: 3, zapIntervalTicks: 30 },
+    drone: { radius: 60, range: 80, lifeTicks: 240, maxZaps: 3, zapIntervalTicks: 30, orbitHz: 0.5 },
     emp: { range: 250, stunTicks: 30 },
     oil: { lifeTicks: 450, radius: 48 },
   },

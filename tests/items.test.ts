@@ -35,10 +35,10 @@ test('missile locks only within 600 u and the 45 degree cone; otherwise dumb-fir
   const offCone = at(createTruck(1, 0, 0, 0), 600, 620);
   const far = at(createTruck(1, 0, 0, 0), 1200, 500);
   const withItem = { ...owner, item: 'missile' as const };
-  assert.equal(useItem(withItem, false, [withItem, inCone], world, 100).lockedSlot, 1);
-  assert.equal(useItem(withItem, false, [withItem, offCone], world, 100).lockedSlot, null);
-  assert.equal(useItem(withItem, false, [withItem, far], world, 100).lockedSlot, null);
-  const back = useItem(withItem, true, [withItem, inCone], world, 100);
+  assert.equal(useItem(withItem, false, [withItem, inCone], world, 100, track).lockedSlot, 1);
+  assert.equal(useItem(withItem, false, [withItem, offCone], world, 100, track).lockedSlot, null);
+  assert.equal(useItem(withItem, false, [withItem, far], world, 100, track).lockedSlot, null);
+  const back = useItem(withItem, true, [withItem, inCone], world, 100, track);
   assert.equal(back.lockedSlot, null);
   assert.ok(Math.abs(Math.abs(back.missiles[0].heading) - Math.PI) < 1e-9);
 });

@@ -3,7 +3,7 @@ import { closestOnSegment, crosses } from './geometry.ts';
 import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import { applyHit, rollItem, stepDrones, stepMines, stepMissiles, useItem, type Drone, type Hit, type Mine, type Missile, type OilSlick } from './items.ts';
 import { createTruck, stepTruck, wrapAngle, type ItemKind, type Truck } from './truck.ts';
-import { surfaceAt, type Point, type Track } from './track.ts';
+import { insideAnyBridge, surfaceAt, type Point, type Track } from './track.ts';
 
 export { crosses } from './geometry.ts';
 
@@ -98,7 +98,7 @@ function resolveContacts(trucks: Truck[]): Truck[] {
   for (let i = 0; i < out.length; i++) {
     for (let j = i + 1; j < out.length; j++) {
       const a = out[i], b = out[j];
-      if (a.respawnAtTick || b.respawnAtTick || a.finishedTick || b.finishedTick) continue;
+      if (a.respawnAtTick || b.respawnAtTick || a.finishedTick || b.finishedTick || a.onBridge !== b.onBridge) continue;
       const dx = b.x - a.x, dy = b.y - a.y;
       const d = Math.hypot(dx, dy);
       if (d >= r2) continue;
@@ -115,8 +115,7 @@ function resolveContacts(trucks: Truck[]): Truck[] {
 
 function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[], oils: OilSlick[]): Truck {
   const c = config.truck;
-  const onSlick = oils.some((o) => Math.hypot(o.x - t.x, o.y - t.y) <= config.items.oil.radius);
-  const kind = onSlick ? 'oil' : surfaceAt(track, t.x, t.y);
+  const kind = surfaceAt(track, t.x, t.y);
   const airborne = tick < t.airborneUntilTick;
   let n = t;
   if (n.landAtTick === tick) {
@@ -124,6 +123,7 @@ function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[],
     events.push({ tick, type: 'land', slot: n.slot });
   }
   if (airborne) return n;
+  if (oils.some((o) => Math.hypot(o.x - t.x, o.y - t.y) <= config.items.oil.radius)) n = { ...n, oilUntilTick: tick + c.oilTicks };
   if (kind !== 'toxic' && n.toxicNextTick) n = { ...n, toxicNextTick: 0 };
   switch (kind) {
     case 'oil': return { ...n, oilUntilTick: tick + c.oilTicks };
@@ -179,7 +179,7 @@ export function progressOf(t: Truck, track: Track): number {
   return t.laps * n + t.checkpoint + (1 - d);
 }
 
-function applyCheckpoints(prev: Truck, t: Truck, track: Track, tick: number, events: RaceEvent[]): Truck {
+function applyCheckpoints(prev: Truck, t: Truck, track: Track, tick: number, events: RaceEvent[], state: RaceState): Truck {
   const n = track.checkpoints.length;
   let n2 = t;
   if (!t.finishedTick) {
@@ -189,6 +189,7 @@ function applyCheckpoints(prev: Truck, t: Truck, track: Track, tick: number, eve
         const laps = t.laps + 1;
         n2 = { ...t, laps, checkpoint: 0 };
         events.push({ tick, type: 'lap', slot: t.slot, lap: laps });
+        if (state.placements[0] === t.slot) n2 = { ...n2, lapsLed: n2.lapsLed + 1 };
         if (laps >= config.laps) n2 = { ...n2, finishedTick: tick };
       } else {
         n2 = { ...t, checkpoint: t.checkpoint + 1 };
@@ -243,13 +244,13 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
     if (t.respawnAtTick) {
       if (tick < t.respawnAtTick) return t;
       const pose = respawnPose(t, track);
-      return { ...t, ...pose, speed: 0, respawnAtTick: 0, respawnedTick: tick, armor: t.stats.maxArmor, invulnerableUntilTick: tick + c.invulnerableTicks, item: null, shieldUntilTick: 0, spinUntilTick: 0, airborneUntilTick: 0, landAtTick: 0, oilUntilTick: 0, nitroUntilTick: 0, boostUntilTick: 0, padUntilTick: 0, driftDir: 0 as const, driftTicks: 0 };
+      return { ...t, ...pose, speed: 0, respawnAtTick: 0, respawnedTick: tick, armor: t.stats.maxArmor, invulnerableUntilTick: tick + c.invulnerableTicks, item: null, shieldUntilTick: 0, spinUntilTick: 0, airborneUntilTick: 0, landAtTick: 0, oilUntilTick: 0, nitroUntilTick: 0, boostUntilTick: 0, padUntilTick: 0, driftDir: 0 as const, driftTicks: 0, onBridge: false };
     }
     const input = inputs[i] ?? NEUTRAL_INPUT;
     const surface = surfaceAt(track, t.x, t.y);
     const [moved, r] = stepTruck(t, input, surface, tick, rng);
     rng = r;
-    return updateBridge(moved, t, track);
+    return moved;
   });
 
   const parked = (t: Truck) => t.respawnAtTick !== 0 || t.finishedTick !== 0;
@@ -264,6 +265,8 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   trucks = resolveContacts(trucks);
   // Contacts can push a truck into a wall; settle position again without a second speed penalty.
   trucks = trucks.map((t, i) => (parked(t) ? t : { ...resolveWalls(t, from(t, i), track, true)[0], speed: t.speed }));
+  // Bridge level is decided from the committed position, so walls resolve with last tick's level (review of ADR 003).
+  trucks = trucks.map((t, i) => (parked(t) ? t : updateBridge(t, prev[i], track)));
 
   // Step 4: item use on a press edge, then projectiles, then hits in launch order (ADR 005).
   let world = { missiles: state.missiles, mines: state.mines, oils: state.oils.filter((o) => tick - o.droppedTick <= config.items.oil.lifeTicks), drones: state.drones, nextId: state.nextId };
@@ -272,7 +275,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
     const t = trucks[i];
     if (parked(t) || !itemHeld[i] || state.itemHeld[i] || !t.item) continue;
     const item = t.item;
-    const r = useItem(t, (inputs[i] ?? NEUTRAL_INPUT).itemAlt, trucks, world, tick);
+    const r = useItem(t, (inputs[i] ?? NEUTRAL_INPUT).itemAlt, trucks, world, tick, track);
     world = { missiles: r.missiles, mines: r.mines, oils: r.oils, drones: r.drones, nextId: r.nextId };
     trucks[i] = r.truck;
     events.push({ tick, type: 'fire', slot: t.slot, item });
@@ -287,9 +290,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   const mv = stepMissiles(world.missiles, trucks, track, tick);
   const mn = stepMines(world.mines, trucks, tick);
   const dr = stepDrones(world.drones, trucks, tick);
-  const { missiles, mines, oils } = { missiles: mv.missiles, mines: mn.mines, oils: world.oils };
-  const drones = dr.drones;
-  const nextId = world.nextId;
+  const missiles = mv.missiles, mines = mn.mines, oils = world.oils, drones = dr.drones, nextId = world.nextId;
   const hits: Hit[] = [...mv.hits, ...mn.hits, ...dr.hits].sort((a, b) => a.id - b.id);
   for (const h of hits) {
     const before = trucks[h.slot];
@@ -322,7 +323,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
     return { ...t, item };
   });
   // A respawn teleport is not a crossing: compare the truck with itself so the chord has zero length.
-  trucks = trucks.map((t, i) => (parked(t) ? t : applyCheckpoints(t.respawnedTick === tick ? t : prev[i], t, track, tick, events)));
+  trucks = trucks.map((t, i) => (parked(t) ? t : applyCheckpoints(t.respawnedTick === tick ? t : prev[i], t, track, tick, events, state)));
 
   const placements = rank(trucks);
   let raceEndTick = state.raceEndTick;

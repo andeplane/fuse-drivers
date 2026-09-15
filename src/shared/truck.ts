@@ -47,6 +47,8 @@ export interface Truck {
   finishedTick: number;
   kills: number;
   deaths: number;
+  lapsLed: number;
+  nitrosUsed: number;
 }
 
 export function createTruck(slot: number, x: number, y: number, heading: number, stats: TruckStats = BASE_STATS): Truck {
@@ -56,7 +58,7 @@ export function createTruck(slot: number, x: number, y: number, heading: number,
     boostUntilTick: 0, nitroUntilTick: 0, padUntilTick: 0, airborneUntilTick: 0, spinUntilTick: 0, stunUntilTick: 0,
     oilUntilTick: 0, shieldUntilTick: 0, invulnerableUntilTick: 0, lockedUntilTick: 0, respawnAtTick: 0, respawnedTick: 0,
     toxicNextTick: 0, landAtTick: 0, wallTicks: 0, prevNitro: false,
-    onBridge: false, laps: 0, checkpoint: 0, progress: 0, wrongWayTicks: 0, finishedTick: 0, kills: 0, deaths: 0,
+    onBridge: false, laps: 0, checkpoint: 0, progress: 0, wrongWayTicks: 0, finishedTick: 0, kills: 0, deaths: 0, lapsLed: 0, nitrosUsed: 0,
   };
 }
 
@@ -126,8 +128,10 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
 
   let nitros = t.nitros;
   let nitroUntilTick = t.nitroUntilTick;
+  let nitrosUsed = t.nitrosUsed;
   if (input.nitro && !t.prevNitro && nitros > 0 && !airborne && !spinning && tick >= nitroUntilTick) {
     nitros -= 1;
+    nitrosUsed += 1;
     nitroUntilTick = tick + c.nitroTicks;
   }
 
@@ -139,5 +143,5 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
   const x = t.x + Math.cos(moveHeading) * speed * mul * DT;
   const y = t.y + Math.sin(moveHeading) * speed * mul * DT;
 
-  return [{ ...t, x, y, heading, speed, nitros, nitroUntilTick, boostUntilTick, turnDir: dir, turnHeldTicks, driftDir, driftTicks, prevNitro: input.nitro }, rng];
+  return [{ ...t, x, y, heading, speed, nitros, nitrosUsed, nitroUntilTick, boostUntilTick, turnDir: dir, turnHeldTicks, driftDir, driftTicks, prevNitro: input.nitro }, rng];
 }

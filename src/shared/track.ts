@@ -136,6 +136,10 @@ export function parseTrack(input: unknown, name = 'track'): Track {
   return { name, cols, rows, tile, surface, walls, checkpoints, spawns, waypoints, items, bridges };
 }
 
+export function insideAnyBridge(track: Track, p: Point): boolean {
+  return track.bridges.some((b) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1);
+}
+
 export function surfaceAt(track: Track, x: number, y: number): SurfaceKind {
   const c = Math.floor(x / track.tile);
   const r = Math.floor(y / track.tile);

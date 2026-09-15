@@ -22,7 +22,7 @@ The between-race shop is what people remember from Super Off Road. It is also th
 | Nitro | 3 | +1 nitro per race (cap 6) |
 
 - Upgrades persist for the series and reset at the next one. The kernel reads per-truck stats, never globals.
-- Bots shop with the same money, buying the cheapest affordable upgrade in round-robin order.
+- Bots shop with the same money, buying the cheapest affordable upgrade (ties in table order) until nothing is affordable.
 - Single race mode skips the shop and uses base stats.
 
 ## Consequences
