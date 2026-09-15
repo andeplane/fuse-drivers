@@ -17,10 +17,14 @@ The user judged the game "terrible" against the chosen concept: tiny trucks on t
 - **M3 party**: `src/shared/room.ts` (pure seat/input reducer, validation, tests), `src/server/main.ts` (Node authority, 15 Hz snapshots, rate limits, shop phase), `pad.html` + `src/pad/main.ts` phone controller, `src/client/net/party.ts` display link, Lobby with QR, PartyShop. `npm start` or `npm run server` + `npm run dev`. Smoke-tested with fake sockets; not yet played on a real phone.
 - **M5 bits**: attract demo after 20 s idle, touch buttons for solo play on touch devices (`src/client/input/touch.ts`).
 
+## Tilted look (done since the first handover)
+
+The user set the goal "do not stop until it is great quality" and described the original as tilted, so style-06 is the working direction. In place: 16-direction trucks from the elevated camera (`assets/raw/trucks-tilted/README.md`, left half mirrored), grandstand band and side crowds drawn by `HudScene.drawStands` in screen space (`STANDS` in `RaceScene` sets the margins), fence with sponsor boards, cube item boxes, raised barriers, barrier-ringed toxic pools, wooden ramps, mogul mounds, ground shadows, frame-cycling spin-outs. Results and Shop are proper tables; every menu screen uses `backdrop()`. `window.game` exists in dev builds for browser checks (screenshots fail while the Browser pane is hidden; read scene state instead).
+
 ## Open
 
-1. **Tilted view** (waiting for approval of style-06). Plan: truck sprites from the elevated camera (the risky part: a single image cannot be rotated; a test 8-direction sheet is in `assets/raw/trucks-tilted/` if it succeeded), mirror the left-facing half to get 16 directions; grandstand strip along the top; item boxes as cubes, ramps as wedges. Keep the flat simulation.
-2. Stadium frame is thinner than the concept; banners are code-drawn text.
+1. Still short of the concept: mud and water puddles are flat ovals, oil blobs read like tyres, the in-world edge decor (pipes, tanks) is soft, no truck wreck sprite after a kill.
+2. Phone pad page is unstyled DOM; party HUD is only verified with fake sockets.
 3. M4 online hosting (same server on a host) and a real-phone party test.
 
 ## Gotchas
