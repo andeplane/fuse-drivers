@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 import { parseTrack } from '../../shared/track.ts';
-import refineryRaw from '../../../tracks/refinery.tmj?raw';
-import sumpRaw from '../../../tracks/sump.tmj?raw';
-import sidewinderRaw from '../../../tracks/sidewinder.tmj?raw';
+const rawTracks = import.meta.glob('../../../tracks/*.tmj', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 export const TRUCK_COLORS = ['cyan', 'pink', 'lime', 'orange', 'violet'] as const;
 export const TRUCK_CELL = 256;
@@ -25,7 +23,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    const tracks = Object.fromEntries(Object.entries({ refinery: refineryRaw, sump: sumpRaw, sidewinder: sidewinderRaw }).map(([n, raw]) => [n, parseTrack(JSON.parse(raw), n)]));
+    const tracks = Object.fromEntries(Object.entries(rawTracks).map(([path, raw]) => { const n = path.split('/').pop()!.replace('.tmj', ''); return [n, parseTrack(JSON.parse(raw), n)]; }));
     this.scene.start('Menu', { tracks });
   }
 }
