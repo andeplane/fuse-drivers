@@ -148,7 +148,30 @@ function build(def: TrackDef) {
   };
 }
 
-for (const def of [refinery]) {
+/** Sump: tight technical layout, a water crossing, two ramps in sequence, a narrow tarmac section (PLAN.md). */
+const sump: TrackDef = {
+  name: 'sump',
+  control: [
+    { x: 520, y: 840 }, { x: 800, y: 840 }, { x: 1000, y: 800 }, { x: 1250, y: 840 }, { x: 1480, y: 760 },
+    { x: 1480, y: 560 }, { x: 1300, y: 470 }, { x: 1120, y: 560 }, { x: 1000, y: 660 }, { x: 800, y: 660 },
+    { x: 640, y: 560 }, { x: 700, y: 400 }, { x: 900, y: 360 }, { x: 1150, y: 400 }, { x: 1400, y: 300 },
+    { x: 1300, y: 160 }, { x: 1000, y: 130 }, { x: 700, y: 170 }, { x: 450, y: 130 }, { x: 200, y: 200 },
+    { x: 130, y: 400 }, { x: 200, y: 600 }, { x: 150, y: 740 }, { x: 300, y: 830 },
+  ],
+  corners: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+  zones: [
+    { surface: 'boost', test: inRect(550, 790, 610, 890) },
+    { surface: 'water', test: inCircle({ x: 850, y: 660 }, 70) },
+    { surface: 'ramp', test: inRect(1420, 700, 1540, 740) },
+    { surface: 'ramp', test: inRect(1420, 600, 1540, 640) },
+    { surface: 'tarmac', test: inRect(650, 90, 1050, 220) },
+    { surface: 'toxic', test: inCircle({ x: 1300, y: 530 }, 55) },
+    { surface: 'mud', test: inCircle({ x: 165, y: 500 }, 80) },
+  ],
+  items: [{ x: 1100, y: 785 }, { x: 1100, y: 815 }, { x: 1100, y: 845 }],
+};
+
+for (const def of [refinery, sump]) {
   writeFileSync(`tracks/${def.name}.tmj`, JSON.stringify(build(def)));
   console.log(`wrote tracks/${def.name}.tmj`);
 }
