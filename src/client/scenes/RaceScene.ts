@@ -75,7 +75,7 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private drawTrack() {
-    const { world, tile } = config;
+    const { tile } = config;
     const rows: number[][] = [];
     for (let r = 0; r < this.track.rows; r++) {
       rows.push(this.track.surface.slice(r * this.track.cols, (r + 1) * this.track.cols).map((s) => (s ? SURFACE_KINDS.indexOf(s) : -1)));
@@ -84,7 +84,7 @@ export class RaceScene extends Phaser.Scene {
     const tiles = map.addTilesetImage('surfaces', 'surfaces', TILE_PX, TILE_PX)!;
     map.createLayer(0, tiles, 0, 0)!.setScale(tile / TILE_PX);
 
-    const g = this.add.graphics().setDepth(5);
+    const g = this.make.graphics({}, false);
     for (const w of this.track.walls) {
       g.lineStyle(8, 0xd62828).beginPath().moveTo(w.a.x, w.a.y).lineTo(w.b.x, w.b.y).strokePath();
       const len = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
@@ -95,13 +95,20 @@ export class RaceScene extends Phaser.Scene {
         g.beginPath().moveTo(w.a.x + ux * d, w.a.y + uy * d).lineTo(w.a.x + ux * e, w.a.y + uy * e).strokePath();
       }
     }
-    for (const b of this.track.bridges) {
-      const deck = this.add.graphics().setDepth(12);
-      deck.fillStyle(0x4a4a52).fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
-      deck.lineStyle(6, 0x222226).strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
-    }
     const finish = this.track.checkpoints[this.track.checkpoints.length - 1];
     g.lineStyle(10, 0xffffff).beginPath().moveTo(finish.a.x, finish.a.y).lineTo(finish.b.x, finish.b.y).strokePath();
+    const decks = this.make.graphics({}, false);
+    for (const b of this.track.bridges) {
+      decks.fillStyle(0x4a4a52).fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+      decks.lineStyle(6, 0x222226).strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    }
+    // Bake both into static textures once instead of re-running ~1000 strokes every frame.
+    const w = this.track.cols * tile, h = this.track.rows * tile;
+    for (const [key, gfx, depth] of [['track-overlay', g, 5], ['bridge-decks', decks, 12]] as const) {
+      if (this.textures.exists(key)) this.textures.remove(key);
+      gfx.generateTexture(key, w, h).destroy();
+      this.add.image(0, 0, key).setOrigin(0).setDepth(depth);
+    }
   }
 
   update(_time: number, delta: number) {
