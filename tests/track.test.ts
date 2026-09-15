@@ -16,7 +16,7 @@ test('parses the committed refinery track', () => {
   assert.equal(t.items.length, 3);
   assert.equal(surfaceAt(t, 860, 830), 'boost');
   assert.equal(surfaceAt(t, 800, 830), 'dirt');
-  assert.equal(surfaceAt(t, -1, 0), 'wall');
+  assert.equal(surfaceAt(t, -1, 0), 'dirt');
   assert.equal(surfaceAt(t, 5, 5), 'dirt');
 });
 

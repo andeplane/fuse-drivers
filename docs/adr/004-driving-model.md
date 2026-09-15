@@ -8,7 +8,7 @@ Super Off Road used eight-way absolute steering on a joystick. A phone thumb, an
 
 ## Decision
 
-- Kernel `stepTruck(truck, input, surface, config)` is turn-then-move at 30 Hz: apply turn rate to heading, then advance by `speed × displacementMultiplier` along heading.
+- Kernel `stepTruck(truck, input, surface, tick, rngState) → [truck, rngState]` is turn-then-move at 30 Hz, reading balance values from the module-level `config`: apply turn rate to heading, then advance by `speed × displacementMultiplier` along heading.
 - **Throttle is always on.** `brake` decelerates and, from a stop, reverses slowly. `left`/`right` turn. `nitro`, `item`, `itemAlt` are actions.
 - Base values (in `config`, per-truck stats added by the shop in ADR 006):
 
@@ -34,13 +34,14 @@ Super Off Road used eight-way absolute steering on a joystick. A phone thumb, an
 | Tarmac | 1.05 | turn rate × 0.9 |
 | Mud | 0.6 | no drift |
 | Water | 0.75 | no drift |
-| Oil | 1.0 | heading noise ±20° for 1 s, turn rate × 0.5 (bounded, seeded) |
+| Oil | 1.0 | for 1 s after contact, each tick's movement direction is offset by a seeded ±20°; heading itself is untouched; turn rate × 0.5 |
 | Boost pad | 1.5 for 0.5 s | directional; wrong way gives nothing |
 | Toxic | 0.6 | −1 armor on entry, then every 15 ticks inside; never below 1; timer resets on exit |
 | Moguls | 0.85 | each bump tile is a 4-tick hop: no steering while airborne, no landing penalty |
 | Ramp | — | airborne trigger |
 
-- **Spin-out** (from damage): 0.8 s, no input, speed × 0.3, heading unchanged in the sim; the sprite tweens a full turn.
+- **Spin-out** (from damage): 0.8 s, no steering or brake, speed × 0.3 then normal acceleration resumes, heading unchanged in the sim; the sprite tweens a full turn.
+- **Drift exit**: leaving a drift-capable surface or dropping below 70 % of top speed ends the drift without a boost.
 
 ## Consequences
 

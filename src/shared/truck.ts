@@ -25,7 +25,6 @@ export interface Truck {
   padUntilTick: number;
   airborneUntilTick: number;
   spinUntilTick: number;
-  stunUntilTick: number;
   oilUntilTick: number;
   shieldUntilTick: number;
   invulnerableUntilTick: number;
@@ -34,8 +33,9 @@ export interface Truck {
   respawnAtTick: number;
   respawnedTick: number;
   toxicNextTick: number;
+  landAtTick: number;
+  wallTicks: number;
   prevNitro: boolean;
-  prevItem: boolean;
   laps: number;
   checkpoint: number;
   progress: number;
@@ -49,16 +49,16 @@ export function createTruck(slot: number, x: number, y: number, heading: number,
   return {
     slot, x, y, heading, speed: 0, stats, armor: stats.maxArmor, nitros: stats.nitros, item: null,
     turnDir: 0, turnHeldTicks: 0, driftDir: 0, driftTicks: 0,
-    boostUntilTick: 0, nitroUntilTick: 0, padUntilTick: 0, airborneUntilTick: 0, spinUntilTick: 0, stunUntilTick: 0,
+    boostUntilTick: 0, nitroUntilTick: 0, padUntilTick: 0, airborneUntilTick: 0, spinUntilTick: 0,
     oilUntilTick: 0, shieldUntilTick: 0, invulnerableUntilTick: 0, lockedUntilTick: 0, respawnAtTick: 0, respawnedTick: 0,
-    toxicNextTick: 0, prevNitro: false, prevItem: false,
+    toxicNextTick: 0, landAtTick: 0, wallTicks: 0, prevNitro: false,
     laps: 0, checkpoint: 0, progress: 0, wrongWayTicks: 0, finishedTick: 0, kills: 0, deaths: 0,
   };
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-export const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+export const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a)) + 0;
 
 /**
  * Turn-then-move kernel (ADR 004). Pure: returns the moved truck and the new RNG state.
@@ -69,7 +69,7 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
   const surf = config.surfaces[surface];
   const airborne = tick < t.airborneUntilTick;
   const spinning = tick < t.spinUntilTick;
-  const canSteer = !airborne && !spinning && tick >= t.stunUntilTick;
+  const canSteer = !airborne && !spinning;
   const speedFrac = clamp(t.speed / t.stats.topSpeed, 0, 1);
   const dir: -1 | 0 | 1 = input.left === input.right ? 0 : input.left ? -1 : 1;
 
@@ -82,6 +82,10 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
   if (canSteer) {
     let turnRate = lerp(c.turnRateLow, t.stats.turnRateHigh, speedFrac) * surf.turnMul;
     if (tick < t.oilUntilTick) turnRate *= c.oilTurnMul;
+    if (driftDir !== 0 && (!surf.drift || speedFrac < c.driftMinSpeedFrac)) {
+      driftDir = 0;
+      driftTicks = 0;
+    }
     if (driftDir !== 0) {
       if (!input.left && !input.right) {
         if (driftTicks >= c.driftBoostTicks) boostUntilTick = tick + c.boostTicks;
@@ -104,18 +108,17 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
     driftTicks = 0;
     turnHeldTicks = 0;
   }
-  if (tick < t.oilUntilTick && !airborne) {
+  heading = wrapAngle(heading);
+  let moveHeading = heading;
+  if (canSteer && tick < t.oilUntilTick) {
     const [r, next] = nextRandom(rng);
     rng = next;
-    heading += (r * 2 - 1) * c.oilNoise * DT;
+    moveHeading = heading + (r * 2 - 1) * c.oilNoise;
   }
-  heading = wrapAngle(heading);
 
   let speed = t.speed;
-  if (!spinning) {
-    if (input.brake && !airborne) speed = Math.max(-c.reverseCap, speed - c.brakeDecel * DT);
-    else speed = Math.min(t.stats.topSpeed, speed + (t.stats.topSpeed / t.stats.accelTime) * DT);
-  }
+  if (input.brake && !airborne && !spinning) speed = Math.max(-c.reverseCap, speed - c.brakeDecel * DT);
+  else speed = Math.min(t.stats.topSpeed, speed + (t.stats.topSpeed / t.stats.accelTime) * DT);
 
   let nitros = t.nitros;
   let nitroUntilTick = t.nitroUntilTick;
@@ -129,8 +132,8 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
   if (driftDir !== 0) mul *= c.driftSpeedMul;
   if (!nitroActive && !airborne) mul *= surf.speed;
 
-  const x = t.x + Math.cos(heading) * speed * mul * DT;
-  const y = t.y + Math.sin(heading) * speed * mul * DT;
+  const x = t.x + Math.cos(moveHeading) * speed * mul * DT;
+  const y = t.y + Math.sin(moveHeading) * speed * mul * DT;
 
-  return [{ ...t, x, y, heading, speed, nitros, nitroUntilTick, boostUntilTick, turnDir: dir, turnHeldTicks, driftDir, driftTicks, prevNitro: input.nitro, prevItem: input.item }, rng];
+  return [{ ...t, x, y, heading, speed, nitros, nitroUntilTick, boostUntilTick, turnDir: dir, turnHeldTicks, driftDir, driftTicks, prevNitro: input.nitro }, rng];
 }

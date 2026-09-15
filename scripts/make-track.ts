@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 
 const TILE = 32, COLS = 50, ROWS = 28, HALF_WIDTH = 45;
-const SURFACES = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp', 'wall'] as const;
+const SURFACES = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp'] as const;
 type Surface = (typeof SURFACES)[number];
 type P = { x: number; y: number };
 

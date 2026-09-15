@@ -20,7 +20,7 @@ export interface Track {
   items: Point[];
 }
 
-const SURFACE_KINDS: SurfaceKind[] = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp', 'wall'];
+const SURFACE_KINDS: SurfaceKind[] = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp'];
 
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => typeof v === 'object' && v !== null;
@@ -120,6 +120,6 @@ export function parseTrack(input: unknown, name = 'track'): Track {
 export function surfaceAt(track: Track, x: number, y: number): SurfaceKind {
   const c = Math.floor(x / track.tile);
   const r = Math.floor(y / track.tile);
-  if (c < 0 || r < 0 || c >= track.cols || r >= track.rows) return 'wall';
+  if (c < 0 || r < 0 || c >= track.cols || r >= track.rows) return 'dirt';
   return track.surface[r * track.cols + c] ?? 'dirt';
 }

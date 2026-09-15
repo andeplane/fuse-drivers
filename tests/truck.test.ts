@@ -39,9 +39,31 @@ test('drift enters on tick 5 of a held turn at speed and boosts after 8 ticks, n
   assert.equal(run(drifted8, {}, 1, 'dirt', 53).boostUntilTick, 53 + config.truck.boostTicks);
 });
 
-test('no drift in mud', () => {
+test('no drift in mud, and an active drift ends without boost on mud or at low speed', () => {
   const fast = run(createTruck(0, 0, 0, 0), {}, 40);
   assert.equal(run(fast, { right: true }, 10, 'mud', 40).driftDir, 0);
+  const drifting = run(fast, { right: true }, 12, 'dirt', 40);
+  assert.equal(drifting.driftDir, 1);
+  const onMud = run(drifting, { right: true }, 1, 'mud', 52);
+  assert.equal(onMud.driftDir, 0);
+  assert.equal(run(onMud, {}, 1, 'mud', 53).boostUntilTick, 0);
+  const slow = run(drifting, { right: true, brake: true }, 30, 'dirt', 52);
+  assert.equal(slow.driftDir, 0);
+});
+
+test('oil offsets movement direction but never heading, and not while spun out', () => {
+  const base = { ...run(createTruck(0, 0, 0, 0), {}, 40), x: 0, y: 0, heading: 0, oilUntilTick: 100 };
+  const [t] = stepTruck(base, NEUTRAL_INPUT, 'dirt', 40, 1);
+  assert.equal(t.heading, 0);
+  assert.notEqual(t.y, 0);
+  assert.ok(Math.abs(Math.atan2(t.y, t.x)) <= config.truck.oilNoise + 1e-9);
+  const [spun] = stepTruck({ ...base, spinUntilTick: 100 }, NEUTRAL_INPUT, 'dirt', 40, 1);
+  assert.equal(spun.y, 0);
+});
+
+test('heading never becomes -0', () => {
+  const [t] = stepTruck({ ...createTruck(0, 0, 0, -0), airborneUntilTick: 5 }, NEUTRAL_INPUT, 'dirt', 0, 1);
+  assert.ok(Object.is(t.heading, 0));
 });
 
 test('nitro consumes one charge on press, not while held or airborne', () => {

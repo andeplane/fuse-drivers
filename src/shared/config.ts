@@ -4,7 +4,7 @@ export const DT = 1 / TICK_RATE;
 export const TICK_MS = 1000 / TICK_RATE;
 const deg = (d: number) => (d * Math.PI) / 180;
 
-export type SurfaceKind = 'dirt' | 'tarmac' | 'mud' | 'water' | 'oil' | 'boost' | 'toxic' | 'mogul' | 'ramp' | 'wall';
+export type SurfaceKind = 'dirt' | 'tarmac' | 'mud' | 'water' | 'oil' | 'boost' | 'toxic' | 'mogul' | 'ramp';
 
 export interface SurfaceRule { speed: number; turnMul: number; drift: boolean }
 
@@ -80,7 +80,6 @@ export const config = {
     toxic: { speed: 0.6, turnMul: 1, drift: true },
     mogul: { speed: 0.85, turnMul: 1, drift: true },
     ramp: { speed: 1, turnMul: 1, drift: true },
-    wall: { speed: 1, turnMul: 1, drift: true },
   } satisfies Record<SurfaceKind, SurfaceRule>,
   items: {
     boxCooldownTicks: 90,
@@ -106,5 +105,3 @@ export const config = {
   prize: [1500, 1300, 1100, 900, 700],
   killBonus: 100,
 } as const;
-
-export type Config = typeof config;
