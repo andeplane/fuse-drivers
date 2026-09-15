@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 Q="${1:-medium}"
-SCENE=$(sed -n '/^> /{s/^> //;p;q}' docs/concepts/README.md)
+SCENE=$(grep -m1 "^> " docs/concepts/README.md | sed "s/^> //")
 names=(neon-pixel arcade-1989 toy-diorama flat-vector wasteland-comic)
 i=0
 sed -n '/^| 1 |/,/^| 5 |/p' docs/concepts/README.md | awk -F'|' '{print $4}' | sed 's/^ *//;s/ *$//' | while IFS= read -r suffix; do
