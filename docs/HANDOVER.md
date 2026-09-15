@@ -18,7 +18,7 @@ State of Fuse Drivers at the end of the first build session. Read this, then `AG
 
 ## Open review findings not yet applied
 
-A client review (src/client) was in flight; results were not received. Known client issues from my own inspection: HUD is placeholder text (the generated HUD sheets in `assets/raw/hud` are not yet used), no sound, no touch controls, the bridge deck is a plain grey rectangle, spin-out tween and frame snapping could fight.
+The client review landed: see `docs/reviews/client-review-2026-09-15.md` (12 ranked findings, none applied yet). Known client issues from my own inspection: HUD is placeholder text (the generated HUD sheets in `assets/raw/hud` are not yet used), no sound, no touch controls, the bridge deck is a plain grey rectangle, spin-out tween and frame snapping could fight.
 
 ## Gotchas
 
