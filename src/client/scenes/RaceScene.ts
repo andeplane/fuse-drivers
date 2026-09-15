@@ -1,15 +1,15 @@
 import Phaser from 'phaser';
-import { BOT_LEVELS, config, SURFACE_KINDS, TICK_MS } from '../../shared/config.ts';
+import { BOT_LEVELS, config, TICK_MS } from '../../shared/config.ts';
 import { applyRace, statsFor, type Series } from '../../shared/series.ts';
-import type { RaceEvent, RaceState } from '../../shared/race.ts';
+import { trackDirectionAt, type RaceEvent, type RaceState } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
 import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
 import { lerp } from '../../shared/truck.ts';
-import type { Segment, Track } from '../../shared/track.ts';
+import type { Point, Segment, Track } from '../../shared/track.ts';
 import { createKeyboard } from '../input/keyboard.ts';
 import type { PartyData } from '../net/party.ts';
 import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
-import { FRAMES, SPRITE_CELL, TILE_PX, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
+import { FRAMES, SPRITE_CELL, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
 
 /** World units per sprite cell: trucks draw a little larger than their 28 u collision circle, chunky like the concept. */
 const TRUCK_SCALE = 54 / (TRUCK_CELL * 0.95);
@@ -115,13 +115,7 @@ export class RaceScene extends Phaser.Scene {
 
   private drawTrack() {
     const { tile } = config;
-    const rows: number[][] = [];
-    for (let r = 0; r < this.track.rows; r++) {
-      rows.push(this.track.surface.slice(r * this.track.cols, (r + 1) * this.track.cols).map((s) => (s ? SURFACE_KINDS.indexOf(s) : -1)));
-    }
-    const map = this.make.tilemap({ data: rows, tileWidth: TILE_PX, tileHeight: TILE_PX });
-    const tiles = map.addTilesetImage('surfaces', 'surfaces', TILE_PX, TILE_PX)!;
-    map.createLayer(0, tiles, 0, 0)!.setScale(tile / TILE_PX);
+    // No tile layer: the floor and every hazard are painted as shapes into the ground canvas, so nothing reads as squares.
     this.drawGround();
 
     const g = this.make.graphics({}, false);
@@ -175,6 +169,140 @@ export class RaceScene extends Phaser.Scene {
   }
 
   /**
+   * Hazards painted as shapes over their tiles, never as squares: pools with a dark rim and a shine, an oil slick with a
+   * sheen, mogul humps, steel ramps with hazard stripes, glowing boost chevrons pointing along the track, tarmac.
+   */
+  private paintHazards(ctx: CanvasRenderingContext2D, rand: () => number) {
+    const { tile } = config;
+    const { cols, surface } = this.track;
+    const cells = (kind: string) => surface.flatMap((s, i) => (s === kind ? [{ x: (i % cols) * tile + tile / 2, y: Math.floor(i / cols) * tile + tile / 2 }] : []));
+    const blob = (pts: Point[], r: number, fill: string) => {
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      for (const p of pts) { ctx.moveTo(p.x + r, p.y); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); }
+      ctx.fill();
+    };
+    /** Connected groups of tiles of one kind, each as one smooth ellipse around them. */
+    const ellipses = (kind: string) => {
+      const pts = cells(kind), seen = new Set<number>(), out: { x: number; y: number; rx: number; ry: number }[] = [];
+      pts.forEach((_, start) => {
+        if (seen.has(start)) return;
+        const group = [start];
+        seen.add(start);
+        for (let g = 0; g < group.length; g++) {
+          pts.forEach((q, j) => { if (!seen.has(j) && Math.hypot(q.x - pts[group[g]].x, q.y - pts[group[g]].y) <= tile * 1.5) { seen.add(j); group.push(j); } });
+        }
+        const xs = group.map((j) => pts[j].x), ys = group.map((j) => pts[j].y);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        out.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, rx: (x1 - x0) / 2 + tile * 0.6, ry: (y1 - y0) / 2 + tile * 0.6 });
+      });
+      return out;
+    };
+    const oval = (e: { x: number; y: number; rx: number; ry: number }, grow: number, fill: string, dx = 0, dy = 0) => {
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.ellipse(e.x + dx, e.y + dy, Math.max(1, e.rx + grow), Math.max(1, e.ry + grow), 0, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    const pool = (kind: string, rim: string, body: string, deep: string, shine: string) => {
+      const list = ellipses(kind);
+      for (const e of list) {
+        oval(e, 5, 'rgba(0,0,0,0.45)', 3, 4);
+        oval(e, 3, '#1a1008');
+        oval(e, 0, rim);
+        oval(e, -5, body);
+        ctx.fillStyle = deep;
+        ctx.beginPath();
+        ctx.ellipse(e.x + e.rx * 0.12, e.y + e.ry * 0.15, e.rx * 0.55, e.ry * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = shine;
+        ctx.beginPath();
+        ctx.ellipse(e.x - e.rx * 0.4, e.y - e.ry * 0.45, e.rx * 0.28, e.ry * 0.12, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return list;
+    };
+    for (const e of pool('toxic', '#3c5a18', '#6ee030', '#3fa51e', 'rgba(235,255,180,0.8)')) {
+      ctx.strokeStyle = 'rgba(210,255,140,0.85)';
+      ctx.lineWidth = 1.5;
+      for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.arc(e.x + (rand() - 0.5) * e.rx, e.y + (rand() - 0.5) * e.ry, 1.5 + rand() * 3, 0, Math.PI * 2); ctx.stroke(); }
+    }
+    pool('water', '#5a4020', '#3f94e6', '#2464b4', 'rgba(225,245,255,0.85)');
+    pool('mud', '#4a2e14', '#6a4422', '#4e3016', 'rgba(170,125,80,0.5)');
+
+    const oil = cells('oil');
+    if (oil.length) {
+      blob(oil, 24, 'rgba(0,0,0,0.35)');
+      blob(oil, 20, '#141418');
+      ctx.lineWidth = 2;
+      for (const p of oil) for (const [c, r] of [['rgba(255,80,200,0.35)', 9], ['rgba(80,200,255,0.35)', 13], ['rgba(255,230,80,0.3)', 16]] as const) {
+        ctx.strokeStyle = c;
+        ctx.beginPath();
+        ctx.arc(p.x + 3, p.y - 2, r, 3.6, 5.4);
+        ctx.stroke();
+      }
+    }
+
+    const tarmac = cells('tarmac');
+    for (const p of tarmac) {
+      ctx.fillStyle = '#4c4c54';
+      ctx.fillRect(p.x - tile / 2, p.y - tile / 2, tile, tile);
+      for (let k = 0; k < 14; k++) { ctx.fillStyle = rand() < 0.5 ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.12)'; ctx.fillRect(p.x - tile / 2 + rand() * tile, p.y - tile / 2 + rand() * tile, 2, 2); }
+    }
+
+    // Moguls: a row of raised dirt humps with a hard shadow and a sunlit top, like the concept's hay-bale mounds.
+    for (const e of ellipses('mogul')) {
+      for (let y = e.y - e.ry + 10; y <= e.y + e.ry - 10; y += 16) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath(); ctx.ellipse(e.x + 4, y + 5, 15, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3a2410';
+        ctx.beginPath(); ctx.ellipse(e.x, y, 15, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#b07636';
+        ctx.beginPath(); ctx.ellipse(e.x, y - 1, 13, 7.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e0aa66';
+        ctx.beginPath(); ctx.ellipse(e.x - 3, y - 3, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    for (const p of cells('ramp')) {
+      const dir = trackDirectionAt(this.track, p), a = Math.atan2(dir.y, dir.x);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(a);
+      const g = ctx.createLinearGradient(-tile / 2, 0, tile / 2, 0);
+      g.addColorStop(0, '#5a5e66');
+      g.addColorStop(1, '#c4c8d0');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(-tile / 2 - 2, -tile / 2 - 2, tile + 4, tile + 4);
+      ctx.fillStyle = g;
+      ctx.fillRect(-tile / 2, -tile / 2, tile, tile);
+      ctx.fillStyle = '#ffd21e';
+      ctx.fillRect(tile / 2 - 6, -tile / 2, 6, tile);
+      ctx.fillStyle = '#111';
+      for (let s = -tile / 2; s < tile / 2; s += 8) ctx.fillRect(tile / 2 - 6, s, 6, 4);
+      ctx.restore();
+    }
+
+    for (const p of cells('boost')) {
+      const dir = trackDirectionAt(this.track, p), a = Math.atan2(dir.y, dir.x);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(a);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(-tile / 2, -tile / 2, tile, tile);
+      ctx.fillStyle = '#0c2a6a';
+      ctx.fillRect(-tile / 2 + 2, -tile / 2 + 2, tile - 4, tile - 4);
+      ctx.strokeStyle = '#4fe3ff';
+      ctx.shadowColor = '#4fe3ff';
+      ctx.shadowBlur = 6;
+      ctx.lineWidth = 4;
+      ctx.lineJoin = 'miter';
+      for (const off of [-7, 5]) { ctx.beginPath(); ctx.moveTo(off - 5, -9); ctx.lineTo(off + 5, 0); ctx.lineTo(off - 5, 9); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
+  /**
    * Bake the floor detail and the stadium into one canvas under everything else: tyre grooves and grit on
    * plain dirt, then crowd, fence, banners and industrial props in the area outside the outer barrier.
    */
@@ -186,6 +314,10 @@ export class RaceScene extends Phaser.Scene {
     const tex = this.textures.createCanvas('track-ground', w, h)!;
     const ctx = tex.getContext();
     const rand = rng([...name].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7));
+
+    // Stadium dirt under everything; the tile layer is gone.
+    ctx.fillStyle = '#8f5d2f';
+    ctx.fillRect(0, 0, w, h);
 
     // Floor detail, clipped to dirt tiles so hazards keep their own look.
     ctx.save();
@@ -220,6 +352,7 @@ export class RaceScene extends Phaser.Scene {
       ctx.stroke();
     }
     ctx.restore();
+    this.paintHazards(ctx, rand);
 
     // Outside = cells reachable from the world border without coming within 30 u of any wall.
     const G = 4, gw = Math.ceil(w / G), gh = Math.ceil(h / G), R = Math.ceil(30 / G);
