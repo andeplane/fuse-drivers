@@ -70,7 +70,8 @@ export class HudScene extends Phaser.Scene {
     this.panel('gold', 18, by + 10, 80, 80);
     this.slot = this.add.image(58, by + 50, 'icons', FRAMES.icons.empty).setScale(54 / 128);
     this.nitros = this.pips(108, by + 32, config.truck.nitroMax, 30, 4, FRAMES.bars.nitro);
-    this.armor = this.pips(108, by + 72, s.trucks[0].stats.maxArmor, 22, 2, 0);
+    // Enough pips for the best-armoured truck; update() shows the followed truck's own count in its colour.
+    this.armor = this.pips(108, by + 72, Math.max(...s.trucks.map((t) => t.stats.maxArmor)), 22, 2, 0);
     this.speed = this.add.text(326, by + 72, '', { ...LABEL, color: '#ffffff' }).setOrigin(1, 0.5);
 
     if (this.race.attract) {
@@ -159,7 +160,7 @@ export class HudScene extends Phaser.Scene {
     const secs = Math.max(0, (s.tick - s.countdownEndTick) / TICK_RATE);
     this.clock.setText(`${Math.floor(secs / 60)}:${(secs % 60).toFixed(1).padStart(4, '0')}`);
     s.trucks.forEach((t, i) => this.chipArmor[i].forEach((p, j) => p.setFrame(2 * i + (j < t.armor ? 0 : 1))));
-    this.armor.forEach((p, j) => p.setFrame(j < me.armor ? 0 : 1));
+    this.armor.forEach((p, j) => p.setVisible(j < me.stats.maxArmor).setFrame(2 * focus + (j < me.armor ? 0 : 1)));
     this.nitros.forEach((p, j) => p.setFrame(j < me.nitros ? FRAMES.bars.nitro : FRAMES.bars.nitroEmpty));
     this.speed.setText(`${Math.round(me.speed / 10) * 10} u/s`);
     this.slot.setFrame(me.item ? FRAMES.icons[me.item] : FRAMES.icons.empty);
