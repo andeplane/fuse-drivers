@@ -62,6 +62,8 @@ export class RaceScene extends Phaser.Scene {
   track!: Track;
   sprites: Phaser.GameObjects.Sprite[] = [];
   shields: Phaser.GameObjects.Image[] = [];
+  /** Burnt wreck shown where a destroyed truck died until it respawns. */
+  wrecks: Phaser.GameObjects.Image[] = [];
   boxes: Phaser.GameObjects.Sprite[] = [];
   missiles = new Map<number, Phaser.GameObjects.Image>();
   mines = new Map<number, Phaser.GameObjects.Image>();
@@ -135,6 +137,7 @@ export class RaceScene extends Phaser.Scene {
       const t = this.runner.state.trucks[i];
       return this.add.sprite(t.x, t.y, `truck-${c}`, 0).setScale(TRUCK_SCALE).setDepth(10);
     });
+    this.wrecks = this.textures.exists('wreck') ? this.sprites.map(() => this.add.image(0, 0, 'wreck').setScale(TRUCK_SCALE * 1.05).setDepth(10).setVisible(false)) : [];
     this.shields = this.sprites.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 2.2).setAlpha(0.55).setDepth(11).setVisible(false));
     this.boxes = this.track.items.map((p) => this.add.sprite(p.x, p.y, 'itembox', 0).setScale(SPRITE_SCALE).setDepth(4).play('box-pulse'));
     this.marks = this.add.graphics().setDepth(12);
@@ -645,7 +648,8 @@ export class RaceScene extends Phaser.Scene {
         (t.onBridge ? this.shadowsHigh : this.shadowsLow).fillStyle(0x000000, air ? 0.22 : 0.38).fillEllipse(p.x + (air ? 6 : 2), p.y + 16, air ? 54 : 46, air ? 20 : 16);
       }
       if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
-      this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(true).setDepth(t.onBridge ? 15 : 10);
+      this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(!(t.respawnAtTick && this.wrecks[i])).setDepth(t.onBridge ? 15 : 10);
+      this.wrecks[i]?.setPosition(p.x, p.y).setVisible(!!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
       if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
       // A wrecked truck stays where it died as a charred hulk until it respawns at the last checkpoint.

@@ -158,6 +158,12 @@ if tilted.exists():
     for i, c in enumerate([missile, smoke, mine_on, mine_off, drone, shield, None, emp]):
         strip.paste(oil if c is None else fit(c, 128), (i * 128, 0))
     strip.save(OUT / 'projectiles.png')
+# Wreck: a burnt truck on its roof from the elevated camera, shown while a destroyed truck waits to respawn.
+wreck = RAW / 'trucks-tilted' / 'wreck-tilted.png'
+if wreck.exists():
+    raw = np.array(Image.open(wreck).convert('RGBA'))
+    raw[raw[..., 3] < 150] = 0
+    fit(Image.fromarray(raw), TRUCK_CELL).save(OUT / 'wreck.png')
 # Stadium decor (assets/raw/tiles/README.md): drum, tyres, pipe, elbow, tank, cone, hay, sign, floodlight, puddle, clump, grass, crowd x3.
 print('decor sprites:', split_sheet('decor', 'tiles', 128))
 
