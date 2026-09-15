@@ -42,8 +42,9 @@ export class MenuScene extends Phaser.Scene {
 
     // Attract mode: after a while without input, bots race a random base track until someone presses a key.
     const base = names.filter((n) => !n.includes('.'));
-    let idle = this.time.delayedCall(ATTRACT_AFTER_MS, () => this.scene.start('Race', { series: createSeries([base[Math.floor(Math.random() * base.length)]], 5, Date.now() >>> 0, 1), tracks: data.tracks, attract: true }));
-    const reset = () => { idle.remove(); idle = this.time.delayedCall(ATTRACT_AFTER_MS, idle.callback!); };
+    const demo = () => this.scene.start('Race', { series: createSeries([base[Math.floor(Math.random() * base.length)]], 5, Date.now() >>> 0, 1), tracks: data.tracks, attract: true });
+    let idle = this.time.delayedCall(ATTRACT_AFTER_MS, demo);
+    const reset = () => { idle.remove(false); idle = this.time.delayedCall(ATTRACT_AFTER_MS, demo); };
     this.input.keyboard!.on('keydown', reset);
     this.input.on('pointermove', reset);
   }
