@@ -12,6 +12,8 @@ export const FRAMES = {
   projectiles: { missile: 0, mineArmed: 2, mineUnarmed: 3, drone: 4, shield: 5, oil: 6, emp: 7 },
   icons: { missile: 0, mine: 1, oil: 2, nitro: 3, shield: 4, drone: 5, emp: 6, empty: 7 },
   explosionFrames: [0, 1, 2, 3, 4],
+  /** Brown dirt puffs in the dust strip. */
+  dust: [1, 2, 3, 4],
   /** bars strip: lit/unlit pairs; armor pair per truck colour at 2 * slot. */
   bars: { nitro: 10, nitroEmpty: 11 },
   countdown: { go: 3, finish: 4 },
@@ -26,7 +28,7 @@ export class BootScene extends Phaser.Scene {
   preload() {
     this.load.image('surfaces', 'assets/surfaces.png');
     for (const c of TRUCK_COLORS) this.load.spritesheet(`truck-${c}`, `assets/truck-${c}.png`, { frameWidth: TRUCK_CELL, frameHeight: TRUCK_CELL });
-    for (const n of ['itembox', 'projectiles', 'explosion', 'icons']) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: SPRITE_CELL, frameHeight: SPRITE_CELL });
+    for (const n of ['itembox', 'projectiles', 'explosion', 'icons', 'dust']) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: SPRITE_CELL, frameHeight: SPRITE_CELL });
     for (const [n, size] of Object.entries(HUD_CELL)) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: size, frameHeight: size });
     for (const p of PANELS) this.load.image(`panel-${p}`, `assets/panel-${p}.png`);
   }

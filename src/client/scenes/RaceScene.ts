@@ -63,6 +63,11 @@ export class RaceScene extends Phaser.Scene {
   oils = new Map<number, Phaser.GameObjects.Image>();
   drones = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
+  shadows: Phaser.GameObjects.Sprite[] = [];
+  dust!: Phaser.GameObjects.Particles.ParticleEmitter;
+  /** Recent sim positions per missile, for the dotted trail. */
+  trails = new Map<number, { x: number; y: number }[]>();
+  lastTick = -1;
   readInput!: ReturnType<typeof createKeyboard>;
   /** State at the tick the race was first seen finished; Results and the HUD placement both use it. */
   final?: RaceState;
@@ -84,6 +89,12 @@ export class RaceScene extends Phaser.Scene {
     this.runner = createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
     this.readInput = createKeyboard(this);
     this.drawTrack();
+    this.trails.clear();
+    this.lastTick = -1;
+    this.shadows = TRUCK_COLORS.map((c) => this.add.sprite(0, 0, `truck-${c}`, 0).setScale(TRUCK_SCALE).setTintFill(0x000000).setAlpha(0.4).setDepth(9).setVisible(false));
+    this.dust = this.add.particles(0, 0, 'dust', {
+      frame: [...FRAMES.dust], lifespan: 450, speed: { min: 5, max: 30 }, scale: { start: SPRITE_SCALE * 0.5, end: SPRITE_SCALE * 0.9 }, alpha: { start: 0.7, end: 0 }, emitting: false,
+    }).setDepth(8);
     this.sprites = TRUCK_COLORS.map((c, i) => {
       const t = this.runner.state.trucks[i];
       return this.add.sprite(t.x, t.y, `truck-${c}`, 0).setScale(TRUCK_SCALE).setDepth(10);
@@ -178,9 +189,14 @@ export class RaceScene extends Phaser.Scene {
     }
     const poses = renderSnapshot(this.runner.previous, state, this.runner.alpha);
     this.marks.clear();
+    // Cosmetic effects sample once per sim tick so their density does not depend on the display frame rate.
+    const newTick = state.tick !== this.lastTick;
+    this.lastTick = state.tick;
     poses.forEach((p, i) => {
       const t = state.trucks[i];
       const air = state.tick < t.airborneUntilTick;
+      this.shadows[i].setPosition(p.x + 10, p.y + 14).setFrame(headingFrame(p.heading)).setVisible(air && !t.respawnAtTick).setDepth(t.onBridge ? 14 : 9);
+      if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
       this.sprites[i].setPosition(p.x, p.y).setFrame(headingFrame(p.heading)).setScale(TRUCK_SCALE * (air ? 1.25 : 1)).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
       if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
@@ -193,6 +209,19 @@ export class RaceScene extends Phaser.Scene {
       const p = prevMissiles.get(m.id) ?? m;
       img.setPosition(lerp(p.x, m.x, alpha), lerp(p.y, m.y, alpha)).setRotation(m.heading + Math.PI / 2);
     });
+    if (newTick) {
+      for (const id of this.trails.keys()) if (!this.missiles.has(id)) this.trails.delete(id);
+      for (const m of state.missiles) {
+        const trail = this.trails.get(m.id) ?? [];
+        trail.push({ x: m.x, y: m.y });
+        if (trail.length > 9) trail.shift();
+        this.trails.set(m.id, trail);
+      }
+    }
+    for (const trail of this.trails.values()) {
+      // The newest point sits under the missile itself, so skip it.
+      trail.slice(0, -1).forEach((pt, k) => this.marks.fillStyle(0xff3030, (k + 1) / trail.length).fillCircle(pt.x, pt.y, 3.5));
+    }
     syncSet(this.mines, state.mines, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.mineUnarmed).setScale(SPRITE_SCALE * 0.7).setDepth(3), (img, m) => img.setFrame(state.tick - m.droppedTick >= config.items.mine.armTicks && state.tick % 10 < 5 ? FRAMES.projectiles.mineArmed : FRAMES.projectiles.mineUnarmed));
     syncSet(this.oils, state.oils, (o) => this.add.image(o.x, o.y, 'projectiles', FRAMES.projectiles.oil).setScale((config.items.oil.radius * 2) / SPRITE_CELL).setDepth(2), (img, o) => img.setAlpha(Math.min(1, (config.items.oil.lifeTicks - (state.tick - o.droppedTick)) / 60)));
     syncSet(this.drones, state.drones, () => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.drone).setScale(SPRITE_SCALE * 0.8).setDepth(13), (img, d) => { const p = dronePosition(d, { ...state.trucks[d.owner], ...poses[d.owner] }, state.tick + alpha); img.setPosition(p.x, p.y).setRotation(state.tick * 0.5); });
