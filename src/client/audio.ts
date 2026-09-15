@@ -7,8 +7,17 @@ import type { RaceScene } from './scenes/RaceScene.ts';
 export function startAudio(game: Phaser.Game) {
   const ctx = new AudioContext();
   const master = ctx.createGain();
-  master.gain.value = 0.5;
   master.connect(ctx.destination);
+  const MUTE_KEY = 'fuse-drivers-muted';
+  let muted = false;
+  try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch { /* storage blocked: start unmuted */ }
+  master.gain.value = muted ? 0 : 0.5;
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || e.key.toLowerCase() !== 'm') return;
+    muted = !muted;
+    master.gain.setTargetAtTime(muted ? 0 : 0.5, ctx.currentTime, 0.02);
+    try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch { /* not persisted */ }
+  });
 
   const unlock = () => { if (ctx.state === 'suspended' && !document.hidden) void ctx.resume(); };
   window.addEventListener('keydown', unlock);

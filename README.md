@@ -15,6 +15,8 @@ Open the printed URL. **Space** starts a single race on the selected track (left
 
 Controls: arrows or **A / D** steer, **S** brake, **Shift** nitro, **Space** use item, hold **Down** with Space to use it the other way (mine lobbed ahead, missile fired backwards). Throttle is always on.
 
+Sound is synthesized in the browser (no audio files) and starts on the first key press; **M** toggles mute and is remembered.
+
 ## Develop
 
 ```sh
