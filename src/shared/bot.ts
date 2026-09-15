@@ -1,4 +1,5 @@
 import { config } from './config.ts';
+import { crosses } from './geometry.ts';
 import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import type { RaceState } from './race.ts';
 import type { Point, Track } from './track.ts';
@@ -10,6 +11,11 @@ export interface BotMemory {
   /** Pending steering decisions, oldest first, for the difficulty delay. */
   queue: TruckInput[];
   lateral: number;
+  /** Wedge detection: where the truck was a second ago; if it is still there with wall contact, back out until reverseUntilTick. */
+  anchorX: number;
+  anchorY: number;
+  anchorTick: number;
+  reverseUntilTick: number;
 }
 
 const DELAY: Record<Difficulty, number> = { easy: 6, normal: 3, hard: 0 };
@@ -20,7 +26,7 @@ const STRAIGHT_LENGTH = 600;
 
 export function createBotMemory(seed: number, slot: number): BotMemory {
   const lateral = ((((seed >>> 0) * 7919 + slot * 104729) >>> 0) % 49) - 24;
-  return { queue: [], lateral };
+  return { queue: [], lateral, anchorX: 0, anchorY: 0, anchorTick: 0, reverseUntilTick: 0 };
 }
 
 /** Nearest waypoint segment and the distance along it of the projection; full scan, the polyline is small. */
@@ -81,9 +87,15 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   }
   const wp = track.waypoints;
   const { i: segment, along } = closestSegment(wp, t);
-  const look = ahead(wp, segment, along + Math.max(80, 0.35 * t.speed));
-  const nx = -Math.sin(look.tangent), ny = Math.cos(look.tangent);
-  const target = { x: look.p.x + nx * memory.lateral, y: look.p.y + ny * memory.lateral };
+  // Shorten the lookahead until the target is visible, so a hairpin never aims through its inside wall.
+  const visible = (p: Point) => !track.walls.some((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge) && crosses(t, p, w));
+  let target = t as Point;
+  for (let d = Math.max(80, 0.35 * t.speed); d >= 30; d /= 2) {
+    const look = ahead(wp, segment, along + d);
+    const nx = -Math.sin(look.tangent), ny = Math.cos(look.tangent);
+    target = { x: look.p.x + nx * memory.lateral, y: look.p.y + ny * memory.lateral };
+    if (visible(target)) break;
+  }
   const err = wrapAngle(Math.atan2(target.y - t.y, target.x - t.x) - t.heading);
 
   const here = tangentOf(wp, segment);
@@ -92,6 +104,23 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     straight = Math.abs(wrapAngle(tangentOf(wp, segment + k) - here)) <= STRAIGHT_CONE;
   }
   const airborneOrSpun = state.tick < t.airborneUntilTick || state.tick < t.spinUntilTick;
+  // Wedged against a wall with the throttle on (still within 20 u of where it was a second ago, oscillating included):
+  // back out for a second, steering away from the target.
+  let { anchorX, anchorY, anchorTick, reverseUntilTick } = memory;
+  if (state.tick - anchorTick >= 30) {
+    const wedged = t.wallTicks >= 30 && Math.hypot(t.x - anchorX, t.y - anchorY) < 20 && !airborneOrSpun;
+    if (wedged && state.tick >= reverseUntilTick) reverseUntilTick = state.tick + 30;
+  }
+  // Facing the wrong way for a second while pressed against a wall (blocked at a crossing): back out and swing round.
+  if (t.wrongWayTicks >= 30 && t.wallTicks >= 10 && state.tick >= reverseUntilTick && !airborneOrSpun) {
+    reverseUntilTick = state.tick + 30;
+    anchorX = t.x; anchorY = t.y; anchorTick = state.tick;
+  }
+  const nextMemory = { ...memory, anchorX, anchorY, anchorTick, reverseUntilTick };
+  if (state.tick < reverseUntilTick) {
+    const backOut: TruckInput = { ...NEUTRAL_INPUT, brake: true, left: err > 0, right: err < 0 };
+    return [backOut, nextMemory];
+  }
   const decided: TruckInput = {
     ...NEUTRAL_INPUT,
     left: err < -STEER_DEADBAND,
@@ -105,5 +134,5 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   const delay = DELAY[difficulty];
   const queue = [...memory.queue, decided].slice(-(delay + 1));
   const input = queue.length > delay ? queue.shift()! : NEUTRAL_INPUT;
-  return [input, { queue, lateral: memory.lateral }];
+  return [input, { ...nextMemory, queue }];
 }

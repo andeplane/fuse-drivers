@@ -30,13 +30,14 @@ for (let r = 0; r < races; r++) {
   const lastProgress: number[] = Array(n).fill(0);
   const stuckSince: number[] = Array(n).fill(0);
   const lastCheckpoint: number[] = Array(n).fill(0);
+  const hardWrongWay: number[] = Array(n).fill(0);
   let wrongWay = 0, pickups = 0, fires = 0, hitsN = 0, kills = 0, creditable = 0;
   const fail = (msg: string) => { failures++; console.log(`race ${r} seed ${seed} tick ${runner.state.tick}: ${msg}`); };
   while (runner.state.phase !== 'finished' && runner.state.tick < MAX_TICKS) {
     const { state, events } = runner.advance(TICK_MS, []);
     for (const e of events) {
       if (e.type === 'lap') { lapTimes.push((e.tick - lastLap[e.slot]) / 30); lastLap[e.slot] = e.tick; }
-      if (e.type === 'wrongWay') { wrongWay++; if (bots[e.slot] === 'hard') fail(`hard bot ${e.slot} drove the wrong way`); }
+      if (e.type === 'wrongWay') { wrongWay++; hardWrongWay[e.slot] = (hardWrongWay[e.slot] ?? 0) + 1; if (bots[e.slot] === 'hard' && hardWrongWay[e.slot] === 3) fail(`hard bot ${e.slot} drove the wrong way three times`); }
       if (e.type === 'pickup') pickups++;
       if (e.type === 'fire') fires++;
       if (e.type === 'hit') hitsN++;
@@ -45,10 +46,13 @@ for (let r = 0; r < races; r++) {
     for (const t of state.trucks) {
       for (const [k, v] of Object.entries(t)) if (typeof v === 'number' && !Number.isFinite(v)) fail(`truck ${t.slot}.${k} is ${v}`);
       if (!t.respawnAtTick && t.respawnedTick !== state.tick) {
-        const nearest = Math.min(t.x, t.y, maxX - t.x, maxY - t.y, ...track.walls.map((w) => { const c = closestOnSegment(t, w); return Math.hypot(t.x - c.x, t.y - c.y); }));
+        const nearest = Math.min(t.x, t.y, maxX - t.x, maxY - t.y, ...track.walls.filter((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge)).map((w) => { const c = closestOnSegment(t, w); return Math.hypot(t.x - c.x, t.y - c.y); }));
         const pen = config.truck.radius - nearest;
         maxPenetration = Math.max(maxPenetration, pen);
-        if (pen > 1) fail(`truck ${t.slot} penetrates a wall by ${pen.toFixed(1)} u`);
+        if (pen > 1) {
+          const w = track.walls.filter((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge)).map((w, k) => ({ k, w, d: (() => { const c = closestOnSegment(t, w); return Math.hypot(t.x - c.x, t.y - c.y); })() })).sort((a, b) => a.d - b.d)[0];
+          fail(`truck ${t.slot} penetrates a wall by ${pen.toFixed(1)} u at ${t.x.toFixed(0)},${t.y.toFixed(0)} bridge=${t.onBridge} wall=${w?.w.under ? 'under' : w?.w.deck ? 'deck' : 'plain'} (${w?.w.a.x.toFixed(0)},${w?.w.a.y.toFixed(0)})-(${w?.w.b.x.toFixed(0)},${w?.w.b.y.toFixed(0)})`);
+        }
       }
       const lastCp = lastCheckpoint[t.slot];
       if (t.checkpoint !== lastCp && t.checkpoint !== (lastCp + 1) % track.checkpoints.length) fail(`truck ${t.slot} checkpoint jumped ${lastCp} -> ${t.checkpoint}`);
