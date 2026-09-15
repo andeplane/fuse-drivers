@@ -40,4 +40,6 @@ npm run build           # production bundle in dist/
 
 ## Status
 
-Milestones M0–M2 from [PLAN.md](PLAN.md) are implemented: three tracks with mirror and reverse variants, bots, all seven items, damage and respawn, series with prize money and shop. M3 (phones as controllers on a TV) and M4 (online) come next; M5 is the art and sound pass.
+Playable: three tracks with mirror and reverse variants, bots that lap all nine layouts cleanly, all seven items, damage and respawn, a five-race series with prize money and shop, party mode with phones as controllers (M3), synthesized sound, touch controls and an attract demo (M5).
+
+The look follows [docs/concepts/style-06-arcade-1989-tilted.png](docs/concepts/style-06-arcade-1989-tilted.png): *Super Off Road*'s elevated three-quarter camera with trucks drawn in 16 directions, raised barriers, a grandstand with sponsor boards and pools ringed by barriers. The simulation stays a flat 2D world; the tilt is presentation only. Online hosting (M4) is the remaining milestone.
