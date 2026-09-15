@@ -24,6 +24,5 @@ export class MenuScene extends Phaser.Scene {
     const series = () => this.scene.start('Race', { series: createSeries(names, 5, Date.now() >>> 0, 5), tracks: data.tracks });
     this.input.keyboard!.once('keydown-SPACE', single);
     this.input.keyboard!.once('keydown-ENTER', series);
-    this.input.once('pointerdown', single);
   }
 }
