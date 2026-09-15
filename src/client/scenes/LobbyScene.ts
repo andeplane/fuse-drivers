@@ -32,7 +32,7 @@ export class LobbyScene extends Phaser.Scene {
       if (link.trackNames.length) trackLabel.setText(`◀ ${link.trackNames[pick % link.trackNames.length].toUpperCase()} ▶`);
       seats.forEach((t, i) => {
         const s = link.seats.find((x) => x.slot === i);
-        t.setText(`P${i + 1}  ${s ? `${s.name}${s.connected ? '' : '  (away)'}` : '·· bot ··'}`).setAlpha(s ? 1 : 0.45);
+        t.setText(`P${i + 1}  ${s ? `${s.name === `P${i + 1}` ? 'READY TO RACE' : s.name}${s.connected ? '' : '  (away)'}` : '·· bot ··'}`).setAlpha(s ? 1 : 0.45);
       });
       if (link.qr && !this.textures.exists(`qr-${link.code}`)) this.textures.addBase64(`qr-${link.code}`, link.qr);
       if (this.textures.exists(`qr-${link.code}`)) qr.setTexture(`qr-${link.code}`).setDisplaySize(380, 380).setVisible(true);

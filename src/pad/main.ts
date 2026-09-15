@@ -63,7 +63,8 @@ function onMessage(m: any) {
       save(storageKey(), m.token);
       const badge = $('badge');
       badge.hidden = false;
-      badge.textContent = `P${m.slot + 1} ${m.name}`;
+      // The server names an unnamed seat after its slot; do not print "P1 P1".
+      badge.textContent = m.name === `P${m.slot + 1}` ? m.name : `P${m.slot + 1} ${m.name}`;
       badge.style.background = COLORS[m.slot];
       history.replaceState(null, '', `?room=${m.code}`);
       return;
