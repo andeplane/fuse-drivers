@@ -37,10 +37,15 @@ function closestSegment(wp: Point[], p: Point): { i: number; along: number } {
   return { i: best, along: bestAlong };
 }
 
+const segmentLength = (wp: Point[], i: number) => { const a = wp[i % wp.length], b = wp[(i + 1) % wp.length]; return Math.hypot(b.x - a.x, b.y - a.y) || 1; };
+const tangentOf = (wp: Point[], i: number) => { const a = wp[i % wp.length], b = wp[(i + 1) % wp.length]; return Math.atan2(b.y - a.y, b.x - a.x); };
+
 /** Walk `distance` units forward along the closed polyline from segment `i`; returns the point and its tangent. */
 function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: number } {
   const n = wp.length;
-  let remaining = distance;
+  let perimeter = 0;
+  for (let k = 0; k < n; k++) perimeter += segmentLength(wp, k);
+  let remaining = distance % perimeter;
   for (let k = 0; k < n; k++) {
     const a = wp[(i + k) % n], b = wp[(i + k + 1) % n];
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
@@ -50,7 +55,7 @@ function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: n
     }
     remaining -= len;
   }
-  return { p: wp[i], tangent: 0 };
+  return { p: wp[i], tangent: tangentOf(wp, i) };
 }
 
 /** ADR 007 item rules: missile at a truck ahead in the cone, mine at a truck behind, shield when locked, nitro at once. */
@@ -80,22 +85,22 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   const target = { x: look.p.x + nx * memory.lateral, y: look.p.y + ny * memory.lateral };
   const err = wrapAngle(Math.atan2(target.y - t.y, target.x - t.x) - t.heading);
 
-  const here = ahead(wp, segment, along).tangent;
+  const here = tangentOf(wp, segment);
   let straight = true;
-  for (let d = 100; d <= STRAIGHT_LENGTH && straight; d += 100) {
-    if (Math.abs(wrapAngle(ahead(wp, segment, along + d).tangent - here)) > STRAIGHT_CONE) straight = false;
+  for (let k = 1, d = segmentLength(wp, segment) - along; d < STRAIGHT_LENGTH && straight && k < wp.length; d += segmentLength(wp, segment + k), k++) {
+    straight = Math.abs(wrapAngle(tangentOf(wp, segment + k) - here)) <= STRAIGHT_CONE;
   }
   const airborneOrSpun = state.tick < t.airborneUntilTick || state.tick < t.spinUntilTick;
   const decided: TruckInput = {
     ...NEUTRAL_INPUT,
     left: err < -STEER_DEADBAND,
     right: err > STEER_DEADBAND,
-    nitro: straight && !airborneOrSpun && t.nitros > 0,
+    nitro: straight && !airborneOrSpun && t.nitros > 0 && !t.prevNitro && state.tick >= t.nitroUntilTick,
     brake: straight && state.tick % 30 < BRAKE_TAP[difficulty],
     item: wantsItem(state, t),
   };
-  const queue = [...memory.queue, decided];
   const delay = DELAY[difficulty];
+  const queue = [...memory.queue, decided].slice(-(delay + 1));
   const input = queue.length > delay ? queue.shift()! : NEUTRAL_INPUT;
   return [input, { queue, lateral: memory.lateral }];
 }

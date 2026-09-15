@@ -3,15 +3,18 @@
  * Usage: npm run sim -- [--races 20] [--seed 1] [--trucks 5] [--track refinery]
  */
 import { readFileSync } from 'node:fs';
-import { BASE_STATS, config } from '../src/shared/config.ts';
+import { BASE_STATS, config, TICK_MS } from '../src/shared/config.ts';
 import type { Difficulty } from '../src/shared/bot.ts';
+import { closestOnSegment } from '../src/shared/geometry.ts';
 import { createRaceRunner } from '../src/shared/runner.ts';
 import { parseTrack } from '../src/shared/track.ts';
-import { TICK_MS } from '../src/shared/config.ts';
 
 const arg = (name: string, def: string) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : def; };
-const races = Number(arg('races', '20')), seed0 = Number(arg('seed', '1')), n = Number(arg('trucks', '5'));
-const track = parseTrack(JSON.parse(readFileSync(`tracks/${arg('track', 'refinery')}.tmj`, 'utf8')), arg('track', 'refinery'));
+const races = Number(arg('races', '20')), seed0 = Number(arg('seed', '1')), n = Number(arg('trucks', '5')), name = arg('track', 'refinery');
+if (!(Number.isInteger(races) && races > 0 && Number.isInteger(n) && n > 0 && n <= 5)) { console.error('usage: sim [--races N] [--seed N] [--trucks 1..5] [--track name]'); process.exit(2); }
+const track = parseTrack(JSON.parse(readFileSync(`tracks/${name}.tmj`, 'utf8')), name);
+const maxX = track.cols * track.tile, maxY = track.rows * track.tile;
+let maxPenetration = 0;
 const levels: Difficulty[] = ['hard', 'normal', 'easy', 'hard', 'normal'];
 const MAX_TICKS = 30 * 240;
 
@@ -26,13 +29,14 @@ for (let r = 0; r < races; r++) {
   const lastLap: number[] = Array(n).fill(0);
   const lastProgress: number[] = Array(n).fill(0);
   const stuckSince: number[] = Array(n).fill(0);
+  const lastCheckpoint: number[] = Array(n).fill(0);
   let wrongWay = 0, pickups = 0, fires = 0, hitsN = 0, kills = 0, creditable = 0;
   const fail = (msg: string) => { failures++; console.log(`race ${r} seed ${seed} tick ${runner.state.tick}: ${msg}`); };
   while (runner.state.phase !== 'finished' && runner.state.tick < MAX_TICKS) {
     const { state, events } = runner.advance(TICK_MS, []);
     for (const e of events) {
       if (e.type === 'lap') { lapTimes.push((e.tick - lastLap[e.slot]) / 30); lastLap[e.slot] = e.tick; }
-      if (e.type === 'wrongWay') wrongWay++;
+      if (e.type === 'wrongWay') { wrongWay++; if (bots[e.slot] === 'hard') fail(`hard bot ${e.slot} drove the wrong way`); }
       if (e.type === 'pickup') pickups++;
       if (e.type === 'fire') fires++;
       if (e.type === 'hit') hitsN++;
@@ -40,7 +44,15 @@ for (let r = 0; r < races; r++) {
     }
     for (const t of state.trucks) {
       for (const [k, v] of Object.entries(t)) if (typeof v === 'number' && !Number.isFinite(v)) fail(`truck ${t.slot}.${k} is ${v}`);
-      if (t.x < 0 || t.y < 0 || t.x > config.world.width || t.y > config.world.height) fail(`truck ${t.slot} outside world at ${t.x.toFixed(1)},${t.y.toFixed(1)}`);
+      if (!t.respawnAtTick && t.respawnedTick !== state.tick) {
+        const nearest = Math.min(t.x, t.y, maxX - t.x, maxY - t.y, ...track.walls.map((w) => { const c = closestOnSegment(t, w); return Math.hypot(t.x - c.x, t.y - c.y); }));
+        const pen = config.truck.radius - nearest;
+        maxPenetration = Math.max(maxPenetration, pen);
+        if (pen > 1) fail(`truck ${t.slot} penetrates a wall by ${pen.toFixed(1)} u`);
+      }
+      const lastCp = lastCheckpoint[t.slot];
+      if (t.checkpoint !== lastCp && t.checkpoint !== (lastCp + 1) % track.checkpoints.length) fail(`truck ${t.slot} checkpoint jumped ${lastCp} -> ${t.checkpoint}`);
+      lastCheckpoint[t.slot] = t.checkpoint;
       if (t.armor < 1 && !t.respawnAtTick) fail(`truck ${t.slot} armor ${t.armor} while alive`);
       if (t.progress > lastProgress[t.slot] + 1e-9) { lastProgress[t.slot] = t.progress; stuckSince[t.slot] = state.tick; }
       else if (!t.finishedTick && state.tick - stuckSince[t.slot] > 300) { fail(`truck ${t.slot} stuck at progress ${t.progress.toFixed(2)}`); stuckSince[t.slot] = state.tick; }
@@ -60,6 +72,7 @@ lapTimes.sort((a, b) => a - b);
 const q = (p: number) => lapTimes[Math.floor(p * (lapTimes.length - 1))]?.toFixed(1);
 console.log(`${races} races, ${totalTicks} ticks in ${secs.toFixed(2)} s (${Math.round(totalTicks / secs)} ticks/s, ${(totalTicks / 30 / secs).toFixed(0)}x realtime)`);
 console.log(`lap time s: min ${q(0)} p50 ${q(0.5)} p90 ${q(0.9)} max ${q(1)}; race length s: ${(totalTicks / races / 30).toFixed(1)} avg`);
+console.log(`max wall penetration ${maxPenetration.toFixed(2)} u`);
 console.log(`per race: ${(totals.pickups / races).toFixed(1)} pickups, ${(totals.fires / races).toFixed(1)} fires, ${(totals.hits / races).toFixed(1)} hits, ${(totals.kills / races).toFixed(1)} kills, ${(totals.wrongWay / races).toFixed(1)} wrong-way`);
 console.log(failures ? `FAIL: ${failures} invariant failures` : 'OK: no invariant failures');
 process.exit(failures ? 1 : 0);

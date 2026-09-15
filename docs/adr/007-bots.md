@@ -8,13 +8,13 @@ Single-player needs opponents, and multiplayer will need to fill empty seats. Fu
 
 ## Decision
 
-- A bot is a pure function `botInput(state, slot, memory, config) → [TruckInput, memory]` called by the race runner (ADR 001) each tick. It sees the same snapshot a player's screen sees.
+- A bot is a pure function `botInput(state, slot, memory, track, difficulty) → [TruckInput, memory]` called by the race runner (ADR 001) each tick. It sees the same snapshot a player's screen sees.
 - **Steering**: target is the point on the track's `waypoints` polyline `max(80, 0.35 × speed)` u ahead of the bot's closest point, offset laterally by a per-race seeded ±24 u so bots do not form a conga line. Press `left`/`right` when the heading error exceeds 6°.
 - **Throttle**: always on, never brake. If a track needs braking, the waypoint line is wrong.
 - **Drift**: emerges from held turns; no special logic.
 - **Nitro**: when the line ahead stays within 15° for at least 600 u and the bot is not airborne or spun out. Rocket start on the countdown.
 - **Items**: missile when a truck is ahead within 500 u inside the ±45° cone; mine when a truck is behind within 300 u; shield when `lockedUntilTick` is set on the bot; nitro refill immediately; (M2) oil like mine, EMP when two or more trucks are within 250 u; otherwise hold.
-- **Difficulty**: easy / normal / hard = steering decisions delayed by 6 / 3 / 0 ticks, and easy / normal bots tap `brake` for 3 / 1 ticks out of every 30 on straights. Everything goes through `TruckInput`; nothing else differs.
+- **Difficulty**: easy / normal / hard = the whole input record delayed by 6 / 3 / 0 ticks, and easy / normal bots tap `brake` for 3 / 1 ticks out of every 30 on straights. Everything goes through `TruckInput`; nothing else differs.
 - **Shop (M2)**: buy the cheapest affordable upgrade in round-robin order (ADR 006).
 
 ## Consequences

@@ -4,7 +4,7 @@ import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import { createRace, step, type RaceEvent, type RaceState } from './race.ts';
 import type { Track } from './track.ts';
 
-export const MAX_STEPS_PER_ADVANCE = 5;
+const MAX_STEPS_PER_ADVANCE = 5;
 
 export interface RaceRunner {
   readonly state: RaceState;
