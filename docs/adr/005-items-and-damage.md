@@ -22,8 +22,8 @@ Mario Kart's items are what turn a racing game into a party game: the leader is 
 | EMP (M2) | 0 | 5 | 15 |
 
 - `item` uses the item in its default direction: mine and oil backward, missile forward. `item` with `itemAlt` held uses the opposite direction. Shield, nitro refill, drone and EMP ignore `itemAlt`.
-- **Missile**: target is the nearest truck within 600 u whose bearing is within ±45° of the owner's heading at launch; no retargeting; no target means dumb-fire. Speed 600 u/s, turn 200°/s, 4 s lifetime, r = 6, destroyed on wall contact, hits the first non-owner non-invulnerable truck it touches, cannot hit for its first 10 ticks. The target's `lockedUntilTick` is set at launch for the missile's lifetime. Backward: dumb-fire. Hit: 1 damage and spin-out.
-- **Mine**: dropped 30 u behind, or lobbed 200 u forward (M2). Armed after 0.5 s, lasts 20 s, visible. Trigger r = 20. Hit: 1 damage and spin-out. Owner is not immune.
+- **Missile**: target is the nearest truck within 600 u whose bearing is within ±45° of the owner's heading at launch; no retargeting; no target means dumb-fire. Speed 600 u/s, turn 200°/s, 4 s lifetime, r = 6, destroyed on wall contact, hits the first non-owner non-invulnerable unfinished truck whose circle its swept path touches, cannot hit for its first 10 ticks. The target's `lockedUntilTick` is set at launch for the missile's lifetime. Backward: dumb-fire. Hit: 1 damage and spin-out.
+- **Mine**: dropped 30 u behind, or lobbed 200 u forward (M2). Armed after 0.5 s, lasts 20 s, visible. Trigger radius 20 plus the truck radius, centre to centre. Hit: 1 damage and spin-out. Owner is not immune.
 - **Oil slick (M2)**: 3×3 tiles of oil for 15 s, overriding the surface.
 - **Drone (M2)**: orbits the owner at r = 60 for 8 s or 3 zaps, whichever first. Any other truck within 80 u takes 1 damage, at most once per second per truck. No spin-out.
 - **Shield**: 6 s. Any blocked effect (missile, mine, drone zap, EMP) consumes the shield and destroys the effect. Does not block toxic damage or landing spin-out.

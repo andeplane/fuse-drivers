@@ -1,7 +1,7 @@
 import { BASE_STATS, config, type TruckStats } from './config.ts';
 import { closestOnSegment, crosses } from './geometry.ts';
 import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
-import { applyHit, rollItem, stepMines, stepMissiles, useItem, type Hit, type Mine, type Missile } from './items.ts';
+import { applyHit, rollItem, stepDrones, stepMines, stepMissiles, useItem, type Drone, type Hit, type Mine, type Missile, type OilSlick } from './items.ts';
 import { createTruck, stepTruck, wrapAngle, type ItemKind, type Truck } from './truck.ts';
 import { surfaceAt, type Point, type Track } from './track.ts';
 
@@ -22,6 +22,8 @@ export interface RaceState {
   placements: number[];
   missiles: Missile[];
   mines: Mine[];
+  oils: OilSlick[];
+  drones: Drone[];
   /** Per box, per slot: tick until which that box is inert for that truck; flat [box * slots + slot]. */
   boxCooldowns: number[];
   /** Whether each slot held the item button last tick, for edge detection. */
@@ -50,7 +52,7 @@ export function createRace(track: Track, seed: number, stats: TruckStats[] = [BA
   });
   return {
     tick: 0, phase: 'countdown', rngState: seed >>> 0, trackName: track.name, trucks, countdownEndTick: config.countdownTicks, raceEndTick: 0,
-    placements: trucks.map((t) => t.slot), missiles: [], mines: [], boxCooldowns: Array(track.items.length * trucks.length).fill(0), itemHeld: trucks.map(() => false), nextId: 1,
+    placements: trucks.map((t) => t.slot), missiles: [], mines: [], oils: [], drones: [], boxCooldowns: Array(track.items.length * trucks.length).fill(0), itemHeld: trucks.map(() => false), nextId: 1,
   };
 }
 
@@ -110,9 +112,10 @@ function resolveContacts(trucks: Truck[]): Truck[] {
   return out;
 }
 
-function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[]): Truck {
+function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[], oils: OilSlick[]): Truck {
   const c = config.truck;
-  const kind = surfaceAt(track, t.x, t.y);
+  const onSlick = oils.some((o) => Math.hypot(o.x - t.x, o.y - t.y) <= config.items.oil.radius);
+  const kind = onSlick ? 'oil' : surfaceAt(track, t.x, t.y);
   const airborne = tick < t.airborneUntilTick;
   let n = t;
   if (n.landAtTick === tick) {
@@ -235,36 +238,48 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   });
 
   const parked = (t: Truck) => t.respawnAtTick !== 0 || t.finishedTick !== 0;
+  // A respawn is a teleport, not a movement: its chord must not be treated as tunnelling.
+  const from = (t: Truck, i: number): Point => (t.respawnedTick === tick ? t : prev[i]);
   trucks = trucks.map((t, i) => {
     if (parked(t)) return t;
-    const [resolved, touching] = resolveWalls(t, prev[i], track, prev[i].wallTicks > 0);
+    const [resolved, touching] = resolveWalls(t, from(t, i), track, prev[i].wallTicks > 0);
     if (touching && prev[i].wallTicks === 0) events.push({ tick, type: 'wall', slot: t.slot });
     return { ...resolved, wallTicks: touching ? prev[i].wallTicks + 1 : 0 };
   });
   trucks = resolveContacts(trucks);
   // Contacts can push a truck into a wall; settle position again without a second speed penalty.
-  trucks = trucks.map((t, i) => (parked(t) ? t : { ...resolveWalls(t, prev[i], track, true)[0], speed: t.speed }));
+  trucks = trucks.map((t, i) => (parked(t) ? t : { ...resolveWalls(t, from(t, i), track, true)[0], speed: t.speed }));
 
   // Step 4: item use on a press edge, then projectiles, then hits in launch order (ADR 005).
-  let { missiles, mines, nextId } = state;
+  let world = { missiles: state.missiles, mines: state.mines, oils: state.oils.filter((o) => tick - o.droppedTick <= config.items.oil.lifeTicks), drones: state.drones, nextId: state.nextId };
   const itemHeld = trucks.map((t, i) => (inputs[i] ?? NEUTRAL_INPUT).item);
-  trucks = trucks.map((t, i) => {
-    if (parked(t) || !itemHeld[i] || state.itemHeld[i] || !t.item) return t;
+  for (let i = 0; i < trucks.length; i++) {
+    const t = trucks[i];
+    if (parked(t) || !itemHeld[i] || state.itemHeld[i] || !t.item) continue;
     const item = t.item;
-    const r = useItem(t, (inputs[i] ?? NEUTRAL_INPUT).itemAlt, trucks, missiles, mines, nextId, tick);
-    missiles = r.missiles; mines = r.mines; nextId = r.nextId;
+    const r = useItem(t, (inputs[i] ?? NEUTRAL_INPUT).itemAlt, trucks, world, tick);
+    world = { missiles: r.missiles, mines: r.mines, oils: r.oils, drones: r.drones, nextId: r.nextId };
+    trucks[i] = r.truck;
     events.push({ tick, type: 'fire', slot: t.slot, item });
     if (r.lockedSlot !== null) trucks[r.lockedSlot] = { ...trucks[r.lockedSlot], lockedUntilTick: tick + config.items.missile.lifeTicks };
-    return r.truck;
-  });
-  const mv = stepMissiles(missiles, trucks, track, tick);
-  const mn = stepMines(mines, trucks, tick);
-  missiles = mv.missiles; mines = mn.mines;
-  const hits: Hit[] = [...mv.hits, ...mn.hits];
+    for (const s of r.stunned) {
+      const o = trucks[s];
+      if (tick < o.shieldUntilTick) { trucks[s] = { ...o, shieldUntilTick: 0 }; events.push({ tick, type: 'hit', slot: s, by: t.slot, item: 'emp', absorbed: true }); continue; }
+      trucks[s] = { ...o, stunUntilTick: tick + config.items.emp.stunTicks, item: null, driftDir: 0, driftTicks: 0 };
+      events.push({ tick, type: 'hit', slot: s, by: t.slot, item: 'emp', absorbed: false });
+    }
+  }
+  const mv = stepMissiles(world.missiles, trucks, track, tick);
+  const mn = stepMines(world.mines, trucks, tick);
+  const dr = stepDrones(world.drones, trucks, tick);
+  const { missiles, mines, oils } = { missiles: mv.missiles, mines: mn.mines, oils: world.oils };
+  const drones = dr.drones;
+  const nextId = world.nextId;
+  const hits: Hit[] = [...mv.hits, ...mn.hits, ...dr.hits].sort((a, b) => a.id - b.id);
   for (const h of hits) {
     const before = trucks[h.slot];
     if (before.respawnAtTick) continue;
-    const r = applyHit(before, tick);
+    const r = applyHit(before, tick, h.item);
     trucks[h.slot] = r.truck;
     events.push({ tick, type: 'hit', slot: h.slot, by: h.by, item: h.item, absorbed: r.absorbed });
     if (r.killed) {
@@ -275,22 +290,21 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   // A missile whose target died or was consumed loses its lock display.
   trucks = trucks.map((t) => (t.lockedUntilTick && !missiles.some((m) => m.target === t.slot) ? { ...t, lockedUntilTick: 0 } : t));
 
-  trucks = trucks.map((t) => (parked(t) ? t : applySurface(t, track, tick, events)));
+  trucks = trucks.map((t) => (parked(t) ? t : applySurface(t, track, tick, events, oils)));
 
   // Step 6: item boxes, rolled in slot order; boxes are never consumed, each truck has a per-box cooldown.
   const boxCooldowns = state.boxCooldowns.slice();
   const slots = trucks.length;
-  track.items.forEach((box, b) => {
-    trucks = trucks.map((t, i) => {
-      if (parked(t) || t.item || tick < boxCooldowns[b * slots + i]) return t;
-      if (Math.hypot(box.x - t.x, box.y - t.y) >= config.truck.radius + config.items.boxRadius) return t;
-      const position = state.placements.indexOf(t.slot) + 1;
-      const [item, next] = rollItem(position, slots, rng);
-      rng = next;
-      boxCooldowns[b * slots + i] = tick + config.items.boxCooldownTicks;
-      events.push({ tick, type: 'pickup', slot: t.slot, item });
-      return { ...t, item };
-    });
+  trucks = trucks.map((t, i) => {
+    if (parked(t) || t.item) return t;
+    const b = track.items.findIndex((box, k) => tick >= boxCooldowns[k * slots + i] && Math.hypot(box.x - t.x, box.y - t.y) < config.truck.radius + config.items.boxRadius);
+    if (b < 0) return t;
+    const position = state.placements.indexOf(t.slot) + 1;
+    const [item, next] = rollItem(position, slots, rng);
+    rng = next;
+    boxCooldowns[b * slots + i] = tick + config.items.boxCooldownTicks;
+    events.push({ tick, type: 'pickup', slot: t.slot, item });
+    return { ...t, item };
   });
   // A respawn teleport is not a crossing: compare the truck with itself so the chord has zero length.
   trucks = trucks.map((t, i) => (parked(t) ? t : applyCheckpoints(t.respawnedTick === tick ? t : prev[i], t, track, tick, events)));
@@ -308,5 +322,5 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   const heading = trucks.map((t) => wrapAngle(t.heading));
   trucks = trucks.map((t, i) => (t.heading === heading[i] ? t : { ...t, heading: heading[i] }));
 
-  return { state: { ...state, tick, rngState: rng, trucks, placements, raceEndTick, phase, missiles, mines, boxCooldowns, itemHeld, nextId }, events };
+  return { state: { ...state, tick, rngState: rng, trucks, placements, raceEndTick, phase, missiles, mines, oils, drones, boxCooldowns, itemHeld, nextId }, events };
 }

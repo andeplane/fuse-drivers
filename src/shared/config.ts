@@ -91,7 +91,7 @@ export const config = {
     nitroRefill: 2,
     drone: { radius: 60, range: 80, lifeTicks: 240, maxZaps: 3, zapIntervalTicks: 30 },
     emp: { range: 250, stunTicks: 30 },
-    oil: { lifeTicks: 450 },
+    oil: { lifeTicks: 450, radius: 48 },
   },
   /** Odds columns: 1st, middle, last (ADR 005). */
   itemOdds: [

@@ -25,6 +25,8 @@ export interface Truck {
   padUntilTick: number;
   airborneUntilTick: number;
   spinUntilTick: number;
+  /** EMP: no steering until this tick. */
+  stunUntilTick: number;
   oilUntilTick: number;
   shieldUntilTick: number;
   invulnerableUntilTick: number;
@@ -49,7 +51,7 @@ export function createTruck(slot: number, x: number, y: number, heading: number,
   return {
     slot, x, y, heading, speed: 0, stats, armor: stats.maxArmor, nitros: stats.nitros, item: null,
     turnDir: 0, turnHeldTicks: 0, driftDir: 0, driftTicks: 0,
-    boostUntilTick: 0, nitroUntilTick: 0, padUntilTick: 0, airborneUntilTick: 0, spinUntilTick: 0,
+    boostUntilTick: 0, nitroUntilTick: 0, padUntilTick: 0, airborneUntilTick: 0, spinUntilTick: 0, stunUntilTick: 0,
     oilUntilTick: 0, shieldUntilTick: 0, invulnerableUntilTick: 0, lockedUntilTick: 0, respawnAtTick: 0, respawnedTick: 0,
     toxicNextTick: 0, landAtTick: 0, wallTicks: 0, prevNitro: false,
     laps: 0, checkpoint: 0, progress: 0, wrongWayTicks: 0, finishedTick: 0, kills: 0, deaths: 0,
@@ -69,7 +71,7 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
   const surf = config.surfaces[surface];
   const airborne = tick < t.airborneUntilTick;
   const spinning = tick < t.spinUntilTick;
-  const canSteer = !airborne && !spinning;
+  const canSteer = !airborne && !spinning && tick >= t.stunUntilTick;
   const speedFrac = clamp(t.speed / t.stats.topSpeed, 0, 1);
   const dir: -1 | 0 | 1 = input.left === input.right ? 0 : input.left ? -1 : 1;
 

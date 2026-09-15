@@ -1,16 +1,19 @@
-import { config } from './config.ts';
+import { config, DT } from './config.ts';
 import { nextRandom } from './rng.ts';
-import { crosses } from './geometry.ts';
+import { closestOnSegment, crosses } from './geometry.ts';
 import type { Point, Track } from './track.ts';
 import { wrapAngle, type ItemKind, type Truck } from './truck.ts';
 
-/** Items shipped in M1; the rest of the ADR 005 table arrives in M2 and rolls with weight zero until then. */
-export const ACTIVE_ITEMS: readonly ItemKind[] = ['mine', 'nitro', 'shield', 'missile'];
+/** Every ADR 005 item is live. */
+export const ACTIVE_ITEMS: readonly ItemKind[] = ['mine', 'oil', 'nitro', 'shield', 'missile', 'drone', 'emp'];
 
 export interface Missile { id: number; owner: number; x: number; y: number; heading: number; launchedTick: number; target: number | null }
 export interface Mine { id: number; owner: number; x: number; y: number; droppedTick: number }
+export interface OilSlick { id: number; owner: number; x: number; y: number; droppedTick: number }
+export interface Drone { id: number; owner: number; launchedTick: number; zaps: number; lastZapTick: number[] }
 
-export interface Hit { slot: number; by: number; item: ItemKind }
+/** `id` is the launching projectile's id so hits resolve in launch order (ADR 005). */
+export interface Hit { id: number; slot: number; by: number; item: ItemKind }
 
 /** Weighted roll by race position: t=0 leader, t=1 last (ADR 005). Returns the item and the new RNG state. */
 export function rollItem(position: number, count: number, rng: number): [ItemKind, number] {
@@ -32,7 +35,7 @@ function nearestTargetAhead(owner: Truck, trucks: Truck[], tick: number): number
   const m = config.items.missile;
   let best: number | null = null, bestD = Infinity;
   for (const t of trucks) {
-    if (t.slot === owner.slot || t.respawnAtTick || tick < t.invulnerableUntilTick) continue;
+    if (t.slot === owner.slot || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick) continue;
     const dx = t.x - owner.x, dy = t.y - owner.y;
     const d = Math.hypot(dx, dy);
     if (d > m.lockRange || d >= bestD) continue;
@@ -42,11 +45,13 @@ function nearestTargetAhead(owner: Truck, trucks: Truck[], tick: number): number
   return best;
 }
 
-export interface UseResult { truck: Truck; missiles: Missile[]; mines: Mine[]; nextId: number; lockedSlot: number | null }
+export interface World { missiles: Missile[]; mines: Mine[]; oils: OilSlick[]; drones: Drone[]; nextId: number }
+export interface UseResult extends World { truck: Truck; lockedSlot: number | null; stunned: number[] }
 
 /** Consume the held item at the committed position (ADR 005). Pure. */
-export function useItem(t: Truck, alt: boolean, trucks: Truck[], missiles: Missile[], mines: Mine[], nextId: number, tick: number): UseResult {
-  const none = { truck: t, missiles, mines, nextId, lockedSlot: null };
+export function useItem(t: Truck, alt: boolean, trucks: Truck[], world: World, tick: number): UseResult {
+  const { missiles, mines, oils, drones, nextId } = world;
+  const none: UseResult = { truck: t, missiles, mines, oils, drones, nextId, lockedSlot: null, stunned: [] };
   if (!t.item) return none;
   const c = config.items;
   switch (t.item) {
@@ -55,22 +60,31 @@ export function useItem(t: Truck, alt: boolean, trucks: Truck[], missiles: Missi
     case 'shield':
       return { ...none, truck: { ...t, item: null, shieldUntilTick: tick + c.shieldTicks } };
     case 'mine': {
-      const back = c.mine.dropBehind;
-      const mine: Mine = { id: nextId, owner: t.slot, x: t.x - Math.cos(t.heading) * back, y: t.y - Math.sin(t.heading) * back, droppedTick: tick };
+      const d = alt ? c.mine.lobAhead : -c.mine.dropBehind;
+      const mine: Mine = { id: nextId, owner: t.slot, x: t.x + Math.cos(t.heading) * d, y: t.y + Math.sin(t.heading) * d, droppedTick: tick };
       return { ...none, truck: { ...t, item: null }, mines: [...mines, mine], nextId: nextId + 1 };
+    }
+    case 'oil': {
+      const d = alt ? c.mine.lobAhead : -c.mine.dropBehind;
+      const oil: OilSlick = { id: nextId, owner: t.slot, x: t.x + Math.cos(t.heading) * d, y: t.y + Math.sin(t.heading) * d, droppedTick: tick };
+      return { ...none, truck: { ...t, item: null }, oils: [...oils, oil], nextId: nextId + 1 };
+    }
+    case 'drone':
+      return { ...none, truck: { ...t, item: null }, drones: [...drones, { id: nextId, owner: t.slot, launchedTick: tick, zaps: 0, lastZapTick: trucks.map(() => 0) }], nextId: nextId + 1 };
+    case 'emp': {
+      const stunned = trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick && !o.finishedTick && tick >= o.invulnerableUntilTick && Math.hypot(o.x - t.x, o.y - t.y) <= c.emp.range).map((o) => o.slot);
+      return { ...none, truck: { ...t, item: null }, stunned };
     }
     case 'missile': {
       const heading = alt ? wrapAngle(t.heading + Math.PI) : t.heading;
       const target = alt ? null : nearestTargetAhead(t, trucks, tick);
       const m: Missile = { id: nextId, owner: t.slot, x: t.x, y: t.y, heading, launchedTick: tick, target };
-      return { truck: { ...t, item: null }, missiles: [...missiles, m], mines, nextId: nextId + 1, lockedSlot: target };
+      return { ...none, truck: { ...t, item: null }, missiles: [...missiles, m], nextId: nextId + 1, lockedSlot: target };
     }
     default:
       return { ...none, truck: { ...t, item: null } };
   }
 }
-
-const DT = 1 / 30;
 
 /** Advance missiles one tick: home, die on walls or age, hit the first eligible truck. Hits are in launch order. */
 export function stepMissiles(missiles: Missile[], trucks: Truck[], track: Track, tick: number): { missiles: Missile[]; hits: Hit[] } {
@@ -88,12 +102,15 @@ export function stepMissiles(missiles: Missile[], trucks: Truck[], track: Track,
     const from: Point = { x: p.x, y: p.y };
     const to: Point = { x: p.x + Math.cos(heading) * m.speed * DT, y: p.y + Math.sin(heading) * m.speed * DT };
     if (track.walls.some((w) => crosses(from, to, w))) continue;
-    if (to.x < 0 || to.y < 0 || to.x > config.world.width || to.y > config.world.height) continue;
     let hit: Truck | undefined;
     if (tick - p.launchedTick >= m.armTicks) {
-      hit = trucks.find((t) => t.slot !== p.owner && !t.respawnAtTick && tick >= t.invulnerableUntilTick && Math.hypot(t.x - to.x, t.y - to.y) < m.radius + config.truck.radius);
+      hit = trucks.find((t) => {
+        if (t.slot === p.owner || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick) return false;
+        const c = closestOnSegment(t, { a: from, b: to });
+        return Math.hypot(t.x - c.x, t.y - c.y) < m.radius + config.truck.radius;
+      });
     }
-    if (hit) { hits.push({ slot: hit.slot, by: p.owner, item: 'missile' }); continue; }
+    if (hit) { hits.push({ id: p.id, slot: hit.slot, by: p.owner, item: 'missile' }); continue; }
     alive.push({ ...p, x: to.x, y: to.y, heading });
   }
   return { missiles: alive, hits };
@@ -107,19 +124,47 @@ export function stepMines(mines: Mine[], trucks: Truck[], tick: number): { mines
   for (const mine of mines) {
     if (tick - mine.droppedTick > c.lifeTicks) continue;
     if (tick - mine.droppedTick >= c.armTicks) {
-      const victim = trucks.find((t) => !t.respawnAtTick && tick >= t.invulnerableUntilTick && Math.hypot(t.x - mine.x, t.y - mine.y) < c.radius + config.truck.radius);
-      if (victim) { hits.push({ slot: victim.slot, by: mine.owner, item: 'mine' }); continue; }
+      const victim = trucks.find((t) => !t.respawnAtTick && !t.finishedTick && tick >= t.invulnerableUntilTick && Math.hypot(t.x - mine.x, t.y - mine.y) < c.radius + config.truck.radius);
+      if (victim) { hits.push({ id: mine.id, slot: victim.slot, by: mine.owner, item: 'mine' }); continue; }
     }
     alive.push(mine);
   }
   return { mines: alive, hits };
 }
 
+/** Drones orbit their owner and zap nearby trucks: 1 damage, no spin-out, once per second per truck, 3 zaps or 8 s. */
+export function stepDrones(drones: Drone[], trucks: Truck[], tick: number): { drones: Drone[]; hits: Hit[] } {
+  const c = config.items.drone;
+  const hits: Hit[] = [];
+  const alive: Drone[] = [];
+  for (const d of drones) {
+    const owner = trucks[d.owner];
+    if (tick - d.launchedTick > c.lifeTicks || d.zaps >= c.maxZaps || owner.respawnAtTick) continue;
+    let zaps = d.zaps;
+    const lastZapTick = d.lastZapTick.slice();
+    for (const t of trucks) {
+      if (zaps >= c.maxZaps) break;
+      if (t.slot === d.owner || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick || tick - lastZapTick[t.slot] < c.zapIntervalTicks) continue;
+      if (Math.hypot(t.x - owner.x, t.y - owner.y) > c.range + c.radius) continue;
+      hits.push({ id: d.id, slot: t.slot, by: d.owner, item: 'drone' });
+      lastZapTick[t.slot] = tick;
+      zaps += 1;
+    }
+    alive.push({ ...d, zaps, lastZapTick });
+  }
+  return { drones: alive, hits };
+}
+
+/** Position of a drone this tick, for rendering and range: orbits the owner at fixed angular speed. */
+export function dronePosition(d: Drone, owner: Truck, tick: number): Point {
+  const a = ((tick - d.launchedTick) / 30) * Math.PI * 2 * 0.5;
+  return { x: owner.x + Math.cos(a) * config.items.drone.radius, y: owner.y + Math.sin(a) * config.items.drone.radius };
+}
+
 export interface DamageResult { truck: Truck; absorbed: boolean; killed: boolean }
 
-/** One hit: shield absorbs, otherwise 1 armor and a spin-out; zero armor explodes (ADR 005). */
-export function applyHit(t: Truck, tick: number): DamageResult {
-  if (tick < t.invulnerableUntilTick) return { truck: t, absorbed: true, killed: false };
+/** One hit: shield absorbs, otherwise 1 armor and a spin-out (drone zaps do not spin); zero armor explodes (ADR 005). */
+export function applyHit(t: Truck, tick: number, item: ItemKind = 'missile'): DamageResult {
   if (tick < t.shieldUntilTick) return { truck: { ...t, shieldUntilTick: 0 }, absorbed: true, killed: false };
   const armor = t.armor - 1;
   const c = config.truck;
@@ -130,5 +175,6 @@ export function applyHit(t: Truck, tick: number): DamageResult {
       killed: true,
     };
   }
+  if (item === 'drone') return { truck: { ...t, armor }, absorbed: false, killed: false };
   return { truck: { ...t, armor, spinUntilTick: tick + c.spinOutTicks, speed: t.speed * c.spinOutSpeedMul, driftDir: 0, driftTicks: 0 }, absorbed: false, killed: false };
 }

@@ -61,13 +61,14 @@ function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: n
 /** ADR 007 item rules: missile at a truck ahead in the cone, mine at a truck behind, shield when locked, nitro at once. */
 function wantsItem(state: RaceState, t: Truck): boolean {
   if (!t.item || state.tick < t.airborneUntilTick) return false;
-  const others = state.trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick);
+  const others = state.trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick && !o.finishedTick && state.tick >= o.invulnerableUntilTick);
   const rel = (o: Truck) => ({ d: Math.hypot(o.x - t.x, o.y - t.y), a: Math.abs(wrapAngle(Math.atan2(o.y - t.y, o.x - t.x) - t.heading)) });
   switch (t.item) {
-    case 'missile': return others.some((o) => { const r = rel(o); return r.d < 500 && r.a < config.items.missile.lockCone; });
-    case 'mine': return others.some((o) => { const r = rel(o); return r.d < 300 && r.a > Math.PI / 2; });
+    case 'missile': return others.some((o) => { const r = rel(o); return (r.d < 500 && r.a < config.items.missile.lockCone) || (r.d < 300 && r.a > Math.PI / 2); });
+    case 'mine': case 'oil': return others.some((o) => { const r = rel(o); return r.d < 300 && r.a > Math.PI / 2; });
     case 'shield': return t.lockedUntilTick > state.tick;
-    case 'nitro': return true;
+    case 'emp': return others.filter((o) => rel(o).d <= config.items.emp.range).length >= 2;
+    case 'nitro': case 'drone': return true;
     default: return false;
   }
 }
@@ -98,6 +99,8 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     nitro: straight && !airborneOrSpun && t.nitros > 0 && !t.prevNitro && state.tick >= t.nitroUntilTick,
     brake: straight && state.tick % 30 < BRAKE_TAP[difficulty],
     item: wantsItem(state, t),
+    // Fire a missile backwards when the threat is behind and nobody is ahead in the cone.
+    itemAlt: t.item === 'missile' && !state.trucks.some((o) => o.slot !== t.slot && !o.respawnAtTick && Math.hypot(o.x - t.x, o.y - t.y) < 500 && Math.abs(wrapAngle(Math.atan2(o.y - t.y, o.x - t.x) - t.heading)) < config.items.missile.lockCone),
   };
   const delay = DELAY[difficulty];
   const queue = [...memory.queue, decided].slice(-(delay + 1));

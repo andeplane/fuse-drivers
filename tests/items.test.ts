@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BASE_STATS, config } from '../src/shared/config.ts';
 import { NEUTRAL_INPUT } from '../src/shared/input.ts';
-import { applyHit, rollItem, stepMissiles, useItem } from '../src/shared/items.ts';
+import { applyHit, rollItem, stepMissiles, useItem, type World } from '../src/shared/items.ts';
 import { createRace, step, type RaceState } from '../src/shared/race.ts';
 import { parseTrack } from '../src/shared/track.ts';
 import { createTruck, type Truck } from '../src/shared/truck.ts';
@@ -11,6 +11,7 @@ import { createTruck, type Truck } from '../src/shared/truck.ts';
 const track = parseTrack(JSON.parse(readFileSync('tracks/refinery.tmj', 'utf8')), 'refinery');
 const racing = (seed: number, n: number): RaceState => ({ ...createRace(track, seed, Array(n).fill(BASE_STATS)), phase: 'racing', tick: 100 });
 const at = (t: Truck, x: number, y: number, heading = 0, extra: Partial<Truck> = {}): Truck => ({ ...t, x, y, heading, ...extra });
+const world: World = { missiles: [], mines: [], oils: [], drones: [], nextId: 1 };
 
 test('odds interpolate by position for 1, 2 and 5 trucks and favour missiles at the back', () => {
   const counts = (position: number, n: number) => {
@@ -24,7 +25,8 @@ test('odds interpolate by position for 1, 2 and 5 trucks and favour missiles at 
   assert.ok(leader.mine > leader.missile);
   assert.ok(last.missile > last.mine);
   assert.ok(two.missile > two.mine);
-  assert.ok(!('oil' in leader) && !('drone' in last) && !('emp' in last));
+  assert.ok('oil' in leader && 'drone' in last && 'emp' in last);
+  assert.ok(!('emp' in leader));
 });
 
 test('missile locks only within 600 u and the 45 degree cone; otherwise dumb-fires', () => {
@@ -33,10 +35,10 @@ test('missile locks only within 600 u and the 45 degree cone; otherwise dumb-fir
   const offCone = at(createTruck(1, 0, 0, 0), 600, 620);
   const far = at(createTruck(1, 0, 0, 0), 1200, 500);
   const withItem = { ...owner, item: 'missile' as const };
-  assert.equal(useItem(withItem, false, [withItem, inCone], [], [], 1, 100).lockedSlot, 1);
-  assert.equal(useItem(withItem, false, [withItem, offCone], [], [], 1, 100).lockedSlot, null);
-  assert.equal(useItem(withItem, false, [withItem, far], [], [], 1, 100).lockedSlot, null);
-  const back = useItem(withItem, true, [withItem, inCone], [], [], 1, 100);
+  assert.equal(useItem(withItem, false, [withItem, inCone], world, 100).lockedSlot, 1);
+  assert.equal(useItem(withItem, false, [withItem, offCone], world, 100).lockedSlot, null);
+  assert.equal(useItem(withItem, false, [withItem, far], world, 100).lockedSlot, null);
+  const back = useItem(withItem, true, [withItem, inCone], world, 100);
   assert.equal(back.lockedSlot, null);
   assert.ok(Math.abs(Math.abs(back.missiles[0].heading) - Math.PI) < 1e-9);
 });
@@ -61,8 +63,6 @@ test('shield absorbs exactly one hit, invulnerable ignores, zero armor explodes 
   assert.ok(!second.absorbed);
   assert.equal(second.truck.armor, 3);
   assert.equal(second.truck.spinUntilTick, 100 + config.truck.spinOutTicks);
-  const inv = applyHit({ ...t, invulnerableUntilTick: 200 }, 100);
-  assert.equal(inv.truck.armor, 4);
   const dying = applyHit({ ...t, shieldUntilTick: 0, armor: 1 }, 100);
   assert.ok(dying.killed);
   assert.equal(dying.truck.item, null);
@@ -97,6 +97,73 @@ test('respawn returns to the last checkpoint with an empty slot and invulnerabil
   assert.ok(t.invulnerableUntilTick > r.state.tick);
   assert.equal(r.state.mines.length, 1);
   assert.equal(r.events.filter((e) => e.type === 'hit').length, 0);
+});
+
+test('a missile sweeps its path, so it cannot tunnel through a truck it overlaps', () => {
+  const m = { id: 1, owner: 0, x: 590, y: 518, heading: 0, launchedTick: 80, target: null };
+  const victim = at(createTruck(1, 0, 0, 0), 600, 500);
+  assert.equal(stepMissiles([m], [victim], { ...track, walls: [] }, 100).hits.length, 1);
+});
+
+test('lock-on lands on a lower slot than the owner, and two pickups on one tick roll in slot order', () => {
+  let s = racing(1, 2);
+  const shooter = at(s.trucks[1], 820, 830, 0, { item: 'missile' });
+  s = { ...s, trucks: [at(s.trucks[0], 900, 830, 0), shooter] };
+  const r = step(s, [NEUTRAL_INPUT, { ...NEUTRAL_INPUT, item: true }], track);
+  assert.ok(r.state.trucks[0].lockedUntilTick > r.state.tick);
+  let p = racing(2, 2);
+  const boxes = track.items;
+  p = { ...p, trucks: [at(p.trucks[0], boxes[2].x, boxes[2].y), at(p.trucks[1], boxes[0].x, boxes[0].y)] };
+  const pr = step(p, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
+  assert.deepEqual(pr.events.filter((e) => e.type === 'pickup').map((e) => e.slot), [0, 1]);
+});
+
+test('a mine and a missile hitting on one tick resolve in launch order', () => {
+  let s = racing(1, 3);
+  const victim = at(s.trucks[2], 900, 830, 0, { armor: 2 });
+  s = { ...s, trucks: [at(s.trucks[0], 820, 830, 0), at(s.trucks[1], 980, 830, Math.PI), victim],
+    mines: [{ id: 5, owner: 0, x: 900, y: 830, droppedTick: 0 }],
+    missiles: [{ id: 2, owner: 1, x: 905, y: 830, heading: Math.PI, launchedTick: 0, target: 2 }], nextId: 6 };
+  const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], track);
+  const kill = r.events.find((e) => e.type === 'kill') as { by: number } | undefined;
+  assert.equal(kill?.by, 0, 'mine id 5 launched after missile id 2, so the mine lands the final hit');
+});
+
+test('toxic cannot kill and a finished truck cannot be hit', () => {
+  let s = racing(1, 2);
+  const toxicTile = (() => { for (let i = 0; i < track.surface.length; i++) if (track.surface[i] === 'toxic') return { x: (i % track.cols) * 32 + 16, y: Math.floor(i / track.cols) * 32 + 16 }; throw new Error('no toxic'); })();
+  s = { ...s, trucks: [at(s.trucks[0], toxicTile.x, toxicTile.y, 0, { armor: 1, speed: 0 }), s.trucks[1]] };
+  for (let i = 0; i < 40; i++) s = step(s, [{ ...NEUTRAL_INPUT, brake: true }, NEUTRAL_INPUT], track).state;
+  assert.equal(s.trucks[0].armor, 1);
+  assert.equal(s.trucks[0].respawnAtTick, 0);
+  let f = racing(1, 2);
+  f = { ...f, trucks: [at(f.trucks[0], 900, 830, 0, { finishedTick: 50 }), f.trucks[1]], mines: [{ id: 1, owner: 1, x: 900, y: 830, droppedTick: 0 }] };
+  const r = step(f, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
+  assert.equal(r.events.filter((e) => e.type === 'hit').length, 0);
+});
+
+test('EMP stuns and strips items within range, shield blocks it; drone zaps without spin-out', () => {
+  let s = racing(1, 3);
+  s = { ...s, trucks: [at(s.trucks[0], 900, 830, 0, { item: 'emp' }), at(s.trucks[1], 1000, 830, 0, { item: 'mine' }), at(s.trucks[2], 950, 830, 0, { shieldUntilTick: 500 })] };
+  const r = step(s, [{ ...NEUTRAL_INPUT, item: true }, NEUTRAL_INPUT, NEUTRAL_INPUT], track);
+  assert.ok(r.state.trucks[1].stunUntilTick > r.state.tick);
+  assert.equal(r.state.trucks[1].item, null);
+  assert.equal(r.state.trucks[2].shieldUntilTick, 0);
+  assert.equal(r.state.trucks[2].stunUntilTick, 0);
+  const zap = applyHit(at(createTruck(0, 0, 0, 0), 0, 0, 0, { speed: 300 }), 100, 'drone');
+  assert.equal(zap.truck.armor, 3);
+  assert.equal(zap.truck.spinUntilTick, 0);
+  assert.equal(zap.truck.speed, 300);
+});
+
+test('respawn pose is the last checkpoint facing the next', () => {
+  let s = racing(1, 1);
+  const dead = { ...s.trucks[0], respawnAtTick: 101, checkpoint: 3 };
+  const r = step({ ...s, trucks: [dead] }, [NEUTRAL_INPUT], track);
+  const last = track.checkpoints[2], next = track.checkpoints[3];
+  assert.equal(r.state.trucks[0].x, last.mid.x);
+  assert.equal(r.state.trucks[0].y, last.mid.y);
+  assert.ok(Math.abs(r.state.trucks[0].heading - Math.atan2(next.mid.y - last.mid.y, next.mid.x - last.mid.x)) < 1e-9);
 });
 
 test('a box gives an item on a press edge, never while holding one, and respects its cooldown', () => {
