@@ -247,7 +247,31 @@ export class RaceScene extends Phaser.Scene {
       }
       return list;
     };
+    /** A raised red/white barrier ring around a pool, front half showing its face like the tilted concept. */
+    const ring = (e: { x: number; y: number; rx: number; ry: number }) => {
+      const rx = e.rx + 6, ry = e.ry + 6, steps = Math.ceil((Math.PI * (rx + ry)) / 3);
+      const at = (i: number, dy = 0) => { const a = (i / steps) * Math.PI * 2; return [e.x + Math.cos(a) * rx, e.y + Math.sin(a) * ry + dy] as const; };
+      const stroke = (width: number, color: (i: number) => string, dy = 0, only?: (i: number) => boolean) => {
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < steps; i++) {
+          if (only && !only(i)) continue;
+          ctx.strokeStyle = color(i);
+          ctx.beginPath();
+          ctx.moveTo(...at(i, dy));
+          ctx.lineTo(...at(i + 1, dy));
+          ctx.stroke();
+        }
+      };
+      const stripe = (i: number) => Math.floor((i * 3) / 14) % 2 === 0;
+      const front = (i: number) => Math.sin(((i + 0.5) / steps) * Math.PI * 2) > -0.2;
+      stroke(11, () => '#000', 5, front);
+      stroke(8, (i) => (stripe(i) ? '#6a1010' : '#6e6e78'), 4, front);
+      stroke(11, () => '#000');
+      stroke(8, (i) => (stripe(i) ? '#f03a3a' : '#ffffff'));
+    };
     for (const e of pool('toxic', '#3c5a18', '#6ee030', '#3fa51e', 'rgba(235,255,180,0.8)')) {
+      ring(e);
       ctx.strokeStyle = 'rgba(210,255,140,0.85)';
       ctx.lineWidth = 1.5;
       for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.arc(e.x + (rand() - 0.5) * e.rx, e.y + (rand() - 0.5) * e.ry, 1.5 + rand() * 3, 0, Math.PI * 2); ctx.stroke(); }
@@ -294,17 +318,22 @@ export class RaceScene extends Phaser.Scene {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(a);
-      const g = ctx.createLinearGradient(-tile / 2, 0, tile / 2, 0);
-      g.addColorStop(0, '#5a5e66');
-      g.addColorStop(1, '#c4c8d0');
+      // A wooden jump wedge rising toward its lip, planks across the direction of travel, dark shadow beyond the lip.
+      const h = tile / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(h, -h, 12, tile);
       ctx.fillStyle = '#000';
-      ctx.fillRect(-tile / 2 - 2, -tile / 2 - 2, tile + 4, tile + 4);
-      ctx.fillStyle = g;
-      ctx.fillRect(-tile / 2, -tile / 2, tile, tile);
-      ctx.fillStyle = '#ffd21e';
-      ctx.fillRect(tile / 2 - 6, -tile / 2, 6, tile);
-      ctx.fillStyle = '#111';
-      for (let s = -tile / 2; s < tile / 2; s += 8) ctx.fillRect(tile / 2 - 6, s, 6, 4);
+      ctx.fillRect(-h - 2, -h - 2, tile + 4, tile + 4);
+      for (let s = -h, k = 0; s < h; s += 6, k++) {
+        const lit = 0.55 + 0.45 * ((s + h) / tile);
+        ctx.fillStyle = `rgb(${Math.round(150 * lit)},${Math.round(98 * lit)},${Math.round(50 * lit)})`;
+        ctx.fillRect(s, -h, 5, tile);
+        if (k % 2) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(s, -h + 4, 5, 2); }
+      }
+      ctx.fillStyle = '#5a3818';
+      ctx.fillRect(h - 5, -h, 5, tile);
+      ctx.fillStyle = '#d9d9e0';
+      for (const y of [-h + 3, h - 6]) ctx.fillRect(-h, y, tile, 3);
       ctx.restore();
     }
 
