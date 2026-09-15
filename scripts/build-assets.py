@@ -87,6 +87,8 @@ def split_sheet(name, group, cell):
 
 counts = {name: split_sheet(name, 'items', 128) for name in ['itembox', 'icons', 'projectiles', 'explosion', 'markers', 'dust']}
 print('item sheets (sprites per strip):', counts)
+# Stadium decor (assets/raw/tiles/README.md): drum, tyres, pipe, elbow, tank, cone, hay, sign, floodlight, puddle, clump, grass, crowd x3.
+print('decor sprites:', split_sheet('decor', 'tiles', 128))
 
 # HUD (assets/raw/hud/README.md). Strips: portraits 6, bars 16 (lit/unlit pairs), countdown 6, placements 5, logo 2.
 counts = {name: split_sheet(name, 'hud', cell) for name, cell in [('portraits', 128), ('bars', 64), ('countdown', 640), ('placements', 256), ('logo', 768)]}

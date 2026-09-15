@@ -25,7 +25,7 @@ Textures were prompted as seamless; verify wrap in-engine, the model does not gu
 | `ramp.png` | 1x2 row, 512 px cells | Wooden jump ramp pointing up with red arrow; dirt landing patch with tyre marks and grass. |
 | `boost.png` | 1x2 row, 512 px cells | Blue chevron boost pad with hazard-stripe rails, frame 1 dim, frame 2 glowing cyan. Chevrons point up; rotate in Tiled for direction. |
 | `startline.png` | 2 cells stacked vertically | Top: horizontal checkered strip with red/yellow end posts (~x 80-940, y 90-245). Bottom: vertical strip (~x 420-605, y 315-935). Not a uniform grid, crop by bounding box. |
-| `decor.png` | 4x4, 256 px cells | Row 1: oil drum, tyre stack, pipe straight, pipe elbow. Row 2: small tank, cone, hay bale, ACE sign board. Row 3: floodlight base, puddle splash mark, dirt clump, grass tuft. Row 4: crowd/grandstand strip x3, empty. |
+| `decor.png` | 4x4, 256 px cells | Row 1: oil drum, tyre stack, pipe straight, pipe elbow. Row 2: small tank, cone, hay bale, ACE sign board. Row 3: floodlight base, puddle splash mark, dirt clump, grass tuft. Row 4: crowd/grandstand strip x3, empty. Cut by `build-assets.py` into `public/assets/decor.png` (15 cells of 128 px in this order); RaceScene tiles the crowd and places props outside the outer barrier. |
 
 ## Known defects
 
