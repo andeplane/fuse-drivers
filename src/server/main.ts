@@ -3,7 +3,7 @@
  * WebSockets on /ws, runs each room's race runner on a timer and streams 15 Hz snapshots to displays.
  * Usage: `npm start` (builds, then serves) or `npm run server` next to `npm run dev` (Vite proxies /ws).
  */
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
@@ -16,7 +16,10 @@ import { createRaceRunner, type RaceRunner } from '../shared/runner.ts';
 import { applyRace, botShop, buy, createSeries, statsFor, type Series } from '../shared/series.ts';
 import { parseTrack, type Track } from '../shared/track.ts';
 
-const PORT = Number(process.env.PORT ?? 8787);
+/** 8787 is Cloudflare wrangler's default and often taken; without an explicit PORT the server walks up to the next free port. */
+const PORT = Number(process.env.PORT ?? 8790);
+/** Where the chosen port is written so `npm run dev` proxies /ws to the right place. */
+export const PORT_FILE = 'node_modules/.fuse-party-port';
 const DIST = resolve('dist');
 const MAX_ROOMS = 100, MAX_MSGS_PER_SEC = 60, ROOM_IDLE_MS = 10 * 60_000, SHOP_MS = 30_000, RESULTS_DELAY_MS = 2500;
 
@@ -155,7 +158,7 @@ const sameOrigin = (origin: string | undefined, host: string | undefined) => {
 };
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1024, verifyClient: ({ origin, req }: { origin: string; req: { headers: { host?: string } } }) => sameOrigin(origin, req.headers.host) });
 // An oversized or malformed frame emits 'error'; without a listener Node would crash and end every room.
-wss.on('error', (e) => console.error('socket server:', e.message));
+wss.on('error', (e: NodeJS.ErrnoException) => { if (e.code !== 'EADDRINUSE') console.error('socket server:', e.message); });
 wss.on('connection', (ws) => {
   ws.on('error', () => ws.terminate());
   let party: Party | undefined, role: 'host' | 'pad' | undefined, slot = -1;
@@ -246,4 +249,25 @@ wss.on('connection', (ws) => {
 });
 
 if (!existsSync(join(DIST, 'index.html'))) console.warn('dist/ is missing: run `npm run build` (or use `npm run dev`, which proxies /ws here).');
-server.listen(PORT, () => console.log(`Fuse Drivers party server: http://${lanAddress()}:${PORT}`));
+function listen(port: number, triesLeft: number) {
+  // One listener pair per attempt, each removing the other, so a failed attempt never logs or records its port later.
+  const onListening = () => {
+    server.off('error', onError);
+    try { writeFileSync(PORT_FILE, String(port)); } catch { /* no node_modules (container): nothing to tell the dev server */ }
+    console.log(`Fuse Drivers party server: http://${lanAddress()}:${port}`);
+  };
+  const onError = (e: NodeJS.ErrnoException) => {
+    server.off('listening', onListening);
+    if (e.code !== 'EADDRINUSE') throw e;
+    if (process.env.PORT || triesLeft === 0) {
+      console.error(`Port ${port} is already in use. Stop whatever uses it, or run with another port, e.g. PORT=${port + 1} npm start`);
+      process.exit(1);
+    }
+    console.warn(`Port ${port} is busy, trying ${port + 1}`);
+    listen(port + 1, triesLeft - 1);
+  };
+  server.once('listening', onListening);
+  server.once('error', onError);
+  server.listen(port);
+}
+listen(PORT, 20);
