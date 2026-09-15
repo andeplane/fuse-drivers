@@ -94,7 +94,12 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   const from = crossing(t.checkpoint - 1), to = crossing(t.checkpoint);
   const { i: segment, along } = from < 0 || to < 0 ? closestSegment(wp, t, 0, wp.length) : closestSegment(wp, t, from, ((to - from + wp.length) % wp.length) + 1);
   // Shorten the lookahead until the target is visible, so a hairpin never aims through its inside wall.
-  const visible = (p: Point) => !track.walls.some((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge) && crosses(t, p, w));
+  // The sight line is tested at both flanks of the truck too, so a target just past a wall tip is not "visible".
+  const flank = 0.8 * config.truck.radius;
+  const visible = (p: Point) => {
+    const len = Math.hypot(p.x - t.x, p.y - t.y) || 1, ox = (-(p.y - t.y) / len) * flank, oy = ((p.x - t.x) / len) * flank;
+    return [0, 1, -1].every((s) => !track.walls.some((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge) && crosses({ x: t.x + ox * s, y: t.y + oy * s }, { x: p.x + ox * s, y: p.y + oy * s }, w)));
+  };
   let target = t as Point;
   for (let d = Math.max(80, 0.35 * t.speed); d >= 30; d /= 2) {
     const look = ahead(wp, segment, along + d);
@@ -130,10 +135,13 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     const backOut: TruckInput = { ...NEUTRAL_INPUT, brake: true, left: err < -STEER_DEADBAND, right: err > STEER_DEADBAND };
     return [backOut, nextMemory];
   }
+  // A drift only ends when both turn buttons are released (ADR 004); countersteering just slows it, so a bot
+  // drifting away from its target lets go instead of circling.
+  const release = t.driftDir !== 0 && Math.sign(err) !== t.driftDir;
   const decided: TruckInput = {
     ...NEUTRAL_INPUT,
-    left: err < -STEER_DEADBAND,
-    right: err > STEER_DEADBAND,
+    left: !release && err < -STEER_DEADBAND,
+    right: !release && err > STEER_DEADBAND,
     nitro: straight && !airborneOrSpun && t.nitros > 0 && !t.prevNitro && state.tick >= t.nitroUntilTick,
     brake: straight && state.tick % 30 < BRAKE_TAP[difficulty],
     item: wantsItem(state, t),
