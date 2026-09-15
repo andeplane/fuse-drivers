@@ -2,8 +2,7 @@ import Phaser from 'phaser';
 import { config } from '../../shared/config.ts';
 import { createSeries } from '../../shared/series.ts';
 import type { Track } from '../../shared/track.ts';
-
-const FONT = { fontFamily: 'monospace', color: '#ffffff', stroke: '#000000', strokeThickness: 6 };
+import { FONT } from './BootScene.ts';
 
 export class MenuScene extends Phaser.Scene {
   constructor() { super('Menu'); }

@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { config, TICK_RATE } from '../../shared/config.ts';
 import type { RaceEvent } from '../../shared/race.ts';
 import type { RaceScene } from './RaceScene.ts';
-import { FRAMES } from './BootScene.ts';
+import { FONT as BASE_FONT, FRAMES } from './BootScene.ts';
 
-const FONT = { fontFamily: 'monospace', fontSize: '28px', color: '#ffffff', stroke: '#000000', strokeThickness: 5 };
+const FONT = { ...BASE_FONT, fontSize: '28px', strokeThickness: 5 };
 
 export class HudScene extends Phaser.Scene {
   race!: RaceScene;

@@ -1,14 +1,11 @@
 import Phaser from 'phaser';
 import { config } from '../../shared/config.ts';
-import { botShop, buy, cost, standings, UPGRADES, type Series, type UpgradeKind } from '../../shared/series.ts';
-import type { Track } from '../../shared/track.ts';
-import { TRUCK_COLORS } from './BootScene.ts';
+import { botShop, buy, cost, standings, UPGRADES, type UpgradeKind } from '../../shared/series.ts';
+import { FONT, TRUCK_COLORS } from './BootScene.ts';
+import type { SeriesData } from './RaceScene.ts';
 
-const FONT = { fontFamily: 'monospace', color: '#ffffff', stroke: '#000000', strokeThickness: 6 };
 const KINDS: UpgradeKind[] = ['topSpeed', 'accel', 'tires', 'shocks', 'armor', 'nitro'];
 export const COLOR_HEX: Record<(typeof TRUCK_COLORS)[number], string> = { cyan: '#2ee6ff', pink: '#ff4fa3', lime: '#9cff2e', orange: '#ff9a2e', violet: '#b45cff' };
-
-export interface SeriesData { series: Series; tracks: Record<string, Track> }
 
 /** Between races: the human buys with arrows and space, bots buy automatically (ADR 006). */
 export class ShopScene extends Phaser.Scene {

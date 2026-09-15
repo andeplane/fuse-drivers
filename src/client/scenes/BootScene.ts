@@ -6,6 +6,7 @@ export const TRUCK_COLORS = ['cyan', 'pink', 'lime', 'orange', 'violet'] as cons
 export const TRUCK_CELL = 256;
 export const TILE_PX = 128;
 export const SPRITE_CELL = 128;
+export const FONT = { fontFamily: 'monospace', color: '#ffffff', stroke: '#000000', strokeThickness: 6 };
 /** Frame indices in the split strips (see scripts/build-assets.py output). */
 export const FRAMES = {
   projectiles: { missile: 0, mineArmed: 2, mineUnarmed: 3, drone: 4, shield: 5, oil: 6, emp: 7 },
@@ -19,7 +20,7 @@ export class BootScene extends Phaser.Scene {
   preload() {
     this.load.image('surfaces', 'assets/surfaces.png');
     for (const c of TRUCK_COLORS) this.load.spritesheet(`truck-${c}`, `assets/truck-${c}.png`, { frameWidth: TRUCK_CELL, frameHeight: TRUCK_CELL });
-    for (const n of ['itembox', 'projectiles', 'explosion', 'icons', 'markers']) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: SPRITE_CELL, frameHeight: SPRITE_CELL });
+    for (const n of ['itembox', 'projectiles', 'explosion', 'icons']) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: SPRITE_CELL, frameHeight: SPRITE_CELL });
   }
 
   create() {

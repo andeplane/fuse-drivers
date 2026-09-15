@@ -1,17 +1,15 @@
 import Phaser from 'phaser';
 import { config, TICK_RATE } from '../../shared/config.ts';
 import type { RaceState } from '../../shared/race.ts';
-import { standings, type Series } from '../../shared/series.ts';
-import type { Track } from '../../shared/track.ts';
-import { TRUCK_COLORS } from './BootScene.ts';
-
-const FONT = { fontFamily: 'monospace', color: '#ffffff', stroke: '#000000', strokeThickness: 6 };
+import { standings } from '../../shared/series.ts';
+import { FONT, TRUCK_COLORS } from './BootScene.ts';
+import type { SeriesData } from './RaceScene.ts';
 import { COLOR_HEX } from './ShopScene.ts';
 
 export class ResultsScene extends Phaser.Scene {
   constructor() { super('Results'); }
 
-  create(data: { state: RaceState; series: Series; tracks: Record<string, Track> }) {
+  create(data: SeriesData & { state: RaceState }) {
     const { width, height } = config.world;
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6);
     const last = data.series.raceIndex >= data.series.tracks.length;
