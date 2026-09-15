@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { config, TICK_RATE } from '../../shared/config.ts';
 import type { RaceEvent } from '../../shared/race.ts';
-import type { RaceScene } from './RaceScene.ts';
+import { SPONSORS, type RaceScene } from './RaceScene.ts';
 import { FONT as BASE_FONT, FRAMES, HUD_CELL, TRUCK_COLORS } from './BootScene.ts';
 
 const FONT = { ...BASE_FONT, fontSize: '30px', fontStyle: 'bold', strokeThickness: 5 };
@@ -42,6 +42,7 @@ export class HudScene extends Phaser.Scene {
     this.race = data.race;
     const { width, height } = config.screen;
     const s = this.race.runner.state;
+    this.drawStands(width, height);
 
     // Top strip: logo, one chip per driver, lap / position / kills / time panel.
     this.add.image(12, TOP + TOP_H / 2, 'logo', 0).setOrigin(0, 0.5).setScale(TOP_H / 380);
@@ -84,6 +85,35 @@ export class HudScene extends Phaser.Scene {
     this.badge = this.add.image(width / 2, height * 0.64, 'placements', 0).setScale(1.1).setVisible(false);
     this.game.events.on('race-event', this.onEvent, this);
     this.events.once('shutdown', () => this.game.events.off('race-event', this.onEvent, this));
+  }
+
+  /**
+   * The stadium around the race view, in screen pixels: a grandstand band between the HUD strip and the track with the
+   * fence and sponsor boards along its bottom, and crowd strips down both sides.
+   */
+  private drawStands(width: number, height: number) {
+    const cam = this.race.cameras.main;
+    const top = TOP + TOP_H + 2, bottom = cam.y;
+    if (this.textures.exists('grandstand')) {
+      const crowd = (x: number, y: number, w: number, h: number) => { if (w > 0 && h > 0) this.add.tileSprite(x, y, w, h, 'grandstand').setOrigin(0).setTileScale(0.55).setDepth(-10); };
+      crowd(0, top, width, bottom - top);
+      crowd(0, bottom, cam.x, height - bottom);
+      crowd(cam.x + cam.width, bottom, width - cam.x - cam.width, height - bottom);
+    }
+    if (!this.textures.exists('fence')) return;
+    const img = this.textures.get('fence').getSourceImage() as HTMLImageElement;
+    const scale = 0.62, fh = img.height * scale, fw = img.width * scale;
+    this.add.tileSprite(0, bottom - fh, width, fh, 'fence').setOrigin(0).setTileScale(scale).setDepth(-9);
+    // Board centres and width as fractions of one fence tile (assets/raw/stadium/README.md); names shrink to fit.
+    const boards = [0.086, 0.238, 0.396, 0.557, 0.721, 0.902], boardW = 0.11 * fw;
+    let k = 0;
+    for (let x = 0; x < width; x += fw) {
+      for (const f of boards) {
+        const [text] = SPONSORS[k++ % SPONSORS.length];
+        const label = this.add.text(x + f * fw, bottom - fh * 0.52, text, { ...LABEL, fontSize: '16px', fontStyle: 'italic bold', color: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5).setDepth(-8);
+        label.setScale(Math.min(1, boardW / label.width));
+      }
+    }
   }
 
   /** The truck the personal panels follow: you in single-player, the leader on a party TV. */

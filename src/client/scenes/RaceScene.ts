@@ -12,8 +12,8 @@ import type { PartyData } from '../net/party.ts';
 import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
 import { FRAMES, SPRITE_CELL, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
 
-/** World units per sprite cell: trucks draw a little larger than their 28 u collision circle, chunky like the concept. */
-const TRUCK_SCALE = 54 / (TRUCK_CELL * 0.95);
+/** World units per sprite cell: tilted trucks draw well beyond their 28 u collision circle, chunky like the concept. */
+const TRUCK_SCALE = 66 / (TRUCK_CELL * 0.95);
 /** World units per sprite pixel for the 128 px item cells: a mine or box is about 36 u across. */
 const SPRITE_SCALE = 36 / SPRITE_CELL;
 
@@ -50,6 +50,9 @@ function strokeWalls(g: Phaser.GameObjects.Graphics, walls: Segment[], width: nu
     run += len;
   }
 }
+
+/** Screen pixels around the race view for the grandstand (top, below the HUD strip) and the side crowds. */
+export const STANDS = { top: 158, side: 56 } as const;
 
 /** Passed between Race, Results and Shop. */
 export interface SeriesData { series: Series; tracks: Record<string, Track> }
@@ -114,9 +117,11 @@ export class RaceScene extends Phaser.Scene {
       };
     }
     this.drawTrack();
-    // The world is smaller than the screen: zoom it to full width under the HUD strip, as in the concept art.
-    const worldW = this.track.cols * config.tile, worldH = this.track.rows * config.tile, zoom = config.screen.width / worldW;
-    this.cameras.main.setViewport(0, config.screen.height - worldH * zoom, config.screen.width, worldH * zoom).setZoom(zoom).centerOn(worldW / 2, worldH / 2);
+    // Zoom the world to fill the screen below the HUD, leaving a grandstand band on top and crowd strips at the sides
+    // (drawn by the HUD in screen space), like the tilted concept art.
+    const worldW = this.track.cols * config.tile, worldH = this.track.rows * config.tile;
+    const zoom = Math.min((config.screen.width - 2 * STANDS.side) / worldW, (config.screen.height - STANDS.top) / worldH);
+    this.cameras.main.setViewport((config.screen.width - worldW * zoom) / 2, config.screen.height - worldH * zoom, worldW * zoom, worldH * zoom).setZoom(zoom).centerOn(worldW / 2, worldH / 2);
     this.trails.clear();
     this.lastTick = -1;
     this.shadows = TRUCK_COLORS.map((c) => this.add.sprite(0, 0, `truck-${c}`, 0).setScale(TRUCK_SCALE).setTintFill(0x000000).setAlpha(0.4).setDepth(9).setVisible(false));
@@ -462,8 +467,16 @@ export class RaceScene extends Phaser.Scene {
     const sc = stands.getContext('2d')!;
     sc.fillStyle = '#2e2e34';
     sc.fillRect(0, 0, w, h);
-    for (let y = 0, r = 0; y < h + 36; y += 34, r++) {
-      for (let x = r % 2 ? 0 : 18; x < w + 36; x += 36) sprite(sc, DECOR.crowd[Math.floor(rand() * 3)], x, y, 46);
+    if (this.textures.exists('grandstand')) {
+      // Rows of spectators from the generated grandstand strip, tiled 240 u wide.
+      const crowd = this.textures.get('grandstand').getSourceImage() as CanvasImageSource & { width: number; height: number };
+      const tw = 240, th = (tw * crowd.height) / crowd.width;
+      sc.imageSmoothingEnabled = true;
+      for (let y = 0; y < h; y += th) for (let x = (Math.round(y / th) % 2) * -tw / 2; x < w; x += tw) sc.drawImage(crowd, x, y, tw, th);
+    } else {
+      for (let y = 0, r = 0; y < h + 36; y += 34, r++) {
+        for (let x = r % 2 ? 0 : 18; x < w + 36; x += 36) sprite(sc, DECOR.crowd[Math.floor(rand() * 3)], x, y, 46);
+      }
     }
     for (let y = 0; y < h + 40; y += 40) { sprite(sc, DECOR.pipe, 14, y, 64, Math.PI / 2); sprite(sc, DECOR.pipe, w - 14, y, 64, Math.PI / 2); }
     sc.globalCompositeOperation = 'destination-in';
@@ -535,10 +548,8 @@ export class RaceScene extends Phaser.Scene {
         this.tweens.add({ targets: ring, scale: (config.items.emp.range * 2) / SPRITE_CELL, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
       }
       if (e.type === 'hit' && !e.absorbed && e.item !== 'drone' && e.item !== 'emp') {
-        const sprite = this.sprites[e.slot];
-        this.tweens.killTweensOf(sprite);
-        sprite.setAngle(0);
-        this.tweens.add({ targets: sprite, angle: 360, duration: config.truck.spinOutTicks * TICK_MS, onComplete: () => sprite.setAngle(0) });
+        // Spin-outs show by cycling direction frames in the pose loop; a rotated tilted sprite would look wrong.
+        this.cameras.main.shake(120, 0.002);
       }
     }
     const poses = renderSnapshot(this.runner.previous, state, this.runner.alpha);
@@ -551,7 +562,7 @@ export class RaceScene extends Phaser.Scene {
       const air = state.tick < t.airborneUntilTick;
       this.shadows[i].setPosition(p.x + 10, p.y + 14).setFrame(headingFrame(p.heading)).setVisible(air && !t.respawnAtTick).setDepth(t.onBridge ? 14 : 9);
       if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
-      this.sprites[i].setPosition(p.x, p.y).setFrame(headingFrame(p.heading)).setScale(TRUCK_SCALE * (air ? 1.25 : 1)).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
+      this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
       if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
       this.sprites[i].setTint(state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
@@ -594,7 +605,7 @@ export class RaceScene extends Phaser.Scene {
 /** Frames in the decor strip cut by scripts/build-assets.py. */
 const DECOR = { drum: 0, tyres: 1, pipe: 2, elbow: 3, tank: 4, sign: 7, light: 8, crowd: [12, 13, 14] } as const;
 /** Made-up sponsors: text, panel colour, text colour. */
-const SPONSORS = [['MR.GRIP', '#d62828', '#ffffff'], ['FUSE OIL', '#ffe600', '#111111'], ['TURBO', '#1f5fd6', '#ffffff'], ['NITRO-X', '#ffffff', '#d62828'], ['DIRT KING', '#111111', '#ffe600']] as const;
+export const SPONSORS = [['MR.GRIP', '#d62828', '#ffffff'], ['FUSE OIL', '#ffe600', '#111111'], ['TURBO', '#1f5fd6', '#ffffff'], ['NITRO-X', '#ffffff', '#d62828'], ['DIRT KING', '#111111', '#ffe600']] as const;
 
 /** Tiny seeded LCG so a track's decor lays out the same way every race. Presentation only. */
 function rng(seed: number) {
