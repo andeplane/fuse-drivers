@@ -63,6 +63,7 @@ function resolveWalls(t: Truck, from: Point, track: Track, wasTouching: boolean)
   let x = t.x, y = t.y, touched = false;
   for (let pass = 0; pass < 2; pass++) {
     for (const w of track.walls) {
+      if ((w.under && t.onBridge) || (w.deck && !t.onBridge)) continue;
       const ex = w.b.x - w.a.x, ey = w.b.y - w.a.y;
       const startSide = Math.sign(ex * (from.y - w.a.y) - ey * (from.x - w.a.x)) || 1;
       const c = closestOnSegment({ x, y }, w);
@@ -139,6 +140,20 @@ function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[],
     }
     default: return n;
   }
+}
+
+/** Entering a bridge rectangle across its entry side sets onBridge; leaving the rectangle clears it (ADR 003). */
+function updateBridge(t: Truck, prev: Truck, track: Track): Truck {
+  let onBridge = t.onBridge;
+  for (const b of track.bridges) {
+    const inside = t.x >= b.x0 && t.x <= b.x1 && t.y >= b.y0 && t.y <= b.y1;
+    const wasInside = prev.x >= b.x0 && prev.x <= b.x1 && prev.y >= b.y0 && prev.y <= b.y1;
+    if (inside && !wasInside) {
+      const fromEntry = (b.entry === 'left' && prev.x < b.x0) || (b.entry === 'right' && prev.x > b.x1) || (b.entry === 'top' && prev.y < b.y0) || (b.entry === 'bottom' && prev.y > b.y1);
+      if (fromEntry) onBridge = true;
+    } else if (!inside && wasInside) onBridge = false;
+  }
+  return onBridge === t.onBridge ? t : { ...t, onBridge };
 }
 
 /** Unit tangent of the nearest waypoint segment: the direction the track is meant to be driven here. */
@@ -234,7 +249,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
     const surface = surfaceAt(track, t.x, t.y);
     const [moved, r] = stepTruck(t, input, surface, tick, rng);
     rng = r;
-    return moved;
+    return updateBridge(moved, t, track);
   });
 
   const parked = (t: Truck) => t.respawnAtTick !== 0 || t.finishedTick !== 0;

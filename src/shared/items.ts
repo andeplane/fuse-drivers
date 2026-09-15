@@ -7,8 +7,8 @@ import { wrapAngle, type ItemKind, type Truck } from './truck.ts';
 /** Every ADR 005 item is live. */
 export const ACTIVE_ITEMS: readonly ItemKind[] = ['mine', 'oil', 'nitro', 'shield', 'missile', 'drone', 'emp'];
 
-export interface Missile { id: number; owner: number; x: number; y: number; heading: number; launchedTick: number; target: number | null }
-export interface Mine { id: number; owner: number; x: number; y: number; droppedTick: number }
+export interface Missile { id: number; owner: number; x: number; y: number; heading: number; launchedTick: number; target: number | null; onBridge: boolean }
+export interface Mine { id: number; owner: number; x: number; y: number; droppedTick: number; onBridge: boolean }
 export interface OilSlick { id: number; owner: number; x: number; y: number; droppedTick: number }
 export interface Drone { id: number; owner: number; launchedTick: number; zaps: number; lastZapTick: number[] }
 
@@ -61,7 +61,7 @@ export function useItem(t: Truck, alt: boolean, trucks: Truck[], world: World, t
       return { ...none, truck: { ...t, item: null, shieldUntilTick: tick + c.shieldTicks } };
     case 'mine': {
       const d = alt ? c.mine.lobAhead : -c.mine.dropBehind;
-      const mine: Mine = { id: nextId, owner: t.slot, x: t.x + Math.cos(t.heading) * d, y: t.y + Math.sin(t.heading) * d, droppedTick: tick };
+      const mine: Mine = { id: nextId, owner: t.slot, x: t.x + Math.cos(t.heading) * d, y: t.y + Math.sin(t.heading) * d, droppedTick: tick, onBridge: t.onBridge };
       return { ...none, truck: { ...t, item: null }, mines: [...mines, mine], nextId: nextId + 1 };
     }
     case 'oil': {
@@ -78,7 +78,7 @@ export function useItem(t: Truck, alt: boolean, trucks: Truck[], world: World, t
     case 'missile': {
       const heading = alt ? wrapAngle(t.heading + Math.PI) : t.heading;
       const target = alt ? null : nearestTargetAhead(t, trucks, tick);
-      const m: Missile = { id: nextId, owner: t.slot, x: t.x, y: t.y, heading, launchedTick: tick, target };
+      const m: Missile = { id: nextId, owner: t.slot, x: t.x, y: t.y, heading, launchedTick: tick, target, onBridge: t.onBridge };
       return { ...none, truck: { ...t, item: null }, missiles: [...missiles, m], nextId: nextId + 1, lockedSlot: target };
     }
     default:
@@ -101,11 +101,11 @@ export function stepMissiles(missiles: Missile[], trucks: Truck[], track: Track,
     }
     const from: Point = { x: p.x, y: p.y };
     const to: Point = { x: p.x + Math.cos(heading) * m.speed * DT, y: p.y + Math.sin(heading) * m.speed * DT };
-    if (track.walls.some((w) => crosses(from, to, w))) continue;
+    if (track.walls.some((w) => !(w.under && p.onBridge) && !(w.deck && !p.onBridge) && crosses(from, to, w))) continue;
     let hit: Truck | undefined;
     if (tick - p.launchedTick >= m.armTicks) {
       hit = trucks.find((t) => {
-        if (t.slot === p.owner || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick) return false;
+        if (t.slot === p.owner || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick || t.onBridge !== p.onBridge) return false;
         const c = closestOnSegment(t, { a: from, b: to });
         return Math.hypot(t.x - c.x, t.y - c.y) < m.radius + config.truck.radius;
       });
@@ -124,7 +124,7 @@ export function stepMines(mines: Mine[], trucks: Truck[], tick: number): { mines
   for (const mine of mines) {
     if (tick - mine.droppedTick > c.lifeTicks) continue;
     if (tick - mine.droppedTick >= c.armTicks) {
-      const victim = trucks.find((t) => !t.respawnAtTick && !t.finishedTick && tick >= t.invulnerableUntilTick && Math.hypot(t.x - mine.x, t.y - mine.y) < c.radius + config.truck.radius);
+      const victim = trucks.find((t) => !t.respawnAtTick && !t.finishedTick && tick >= t.invulnerableUntilTick && t.onBridge === mine.onBridge && Math.hypot(t.x - mine.x, t.y - mine.y) < c.radius + config.truck.radius);
       if (victim) { hits.push({ id: mine.id, slot: victim.slot, by: mine.owner, item: 'mine' }); continue; }
     }
     alive.push(mine);

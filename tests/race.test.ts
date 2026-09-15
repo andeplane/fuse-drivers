@@ -37,7 +37,7 @@ test('replay is deterministic and matches the recorded hash', () => {
   assert.equal(hash(a), hash(b));
   assert.equal(JSON.stringify(a), JSON.stringify(JSON.parse(JSON.stringify(a))));
   // Update this hash on purpose only, and say so in the commit message (AGENTS.md).
-  assert.equal(hash(a), '4c93cd212c0034fb');
+  assert.equal(hash(a), '8c66d9cea9ffbf8e');
 });
 
 test('countdown holds trucks and rocket start arms a boost', () => {

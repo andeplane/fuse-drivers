@@ -38,6 +38,8 @@ export interface Truck {
   landAtTick: number;
   wallTicks: number;
   prevNitro: boolean;
+  /** Set while crossing a bridge deck: walls tagged `under` are ignored and the truck draws above decor (ADR 003). */
+  onBridge: boolean;
   laps: number;
   checkpoint: number;
   progress: number;
@@ -54,7 +56,7 @@ export function createTruck(slot: number, x: number, y: number, heading: number,
     boostUntilTick: 0, nitroUntilTick: 0, padUntilTick: 0, airborneUntilTick: 0, spinUntilTick: 0, stunUntilTick: 0,
     oilUntilTick: 0, shieldUntilTick: 0, invulnerableUntilTick: 0, lockedUntilTick: 0, respawnAtTick: 0, respawnedTick: 0,
     toxicNextTick: 0, landAtTick: 0, wallTicks: 0, prevNitro: false,
-    laps: 0, checkpoint: 0, progress: 0, wrongWayTicks: 0, finishedTick: 0, kills: 0, deaths: 0,
+    onBridge: false, laps: 0, checkpoint: 0, progress: 0, wrongWayTicks: 0, finishedTick: 0, kills: 0, deaths: 0,
   };
 }
 

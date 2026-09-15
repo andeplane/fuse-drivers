@@ -45,7 +45,7 @@ test('missile locks only within 600 u and the 45 degree cone; otherwise dumb-fir
 
 test('missile dies on a wall and cannot hit in its first 10 ticks', () => {
   const wall = { ...track, walls: [{ a: { x: 600, y: 400 }, b: { x: 600, y: 600 } }] };
-  const m = { id: 1, owner: 0, x: 590, y: 500, heading: 0, launchedTick: 100, target: null };
+  const m = { id: 1, owner: 0, x: 590, y: 500, heading: 0, launchedTick: 100, target: null, onBridge: false };
   assert.equal(stepMissiles([m], [], wall, 101).missiles.length, 0);
   const victim = at(createTruck(1, 0, 0, 0), 615, 500);
   const young = stepMissiles([{ ...m, x: 590 }], [victim], { ...track, walls: [] }, 105);
@@ -74,8 +74,8 @@ test('two hits on one tick from two owners kill a two-armor truck and credit the
   const victim = at(s.trucks[2], 900, 830, 0, { armor: 2 });
   const a = at(s.trucks[0], 820, 830, 0), b = at(s.trucks[1], 980, 830, 0);
   s = { ...s, trucks: [a, b, victim], mines: [
-    { id: 1, owner: 0, x: 900, y: 830, droppedTick: 0 },
-    { id: 2, owner: 1, x: 902, y: 830, droppedTick: 0 },
+    { id: 1, owner: 0, x: 900, y: 830, droppedTick: 0, onBridge: false },
+    { id: 2, owner: 1, x: 902, y: 830, droppedTick: 0, onBridge: false },
   ], nextId: 3 };
   const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], track);
   const kills = r.events.filter((e) => e.type === 'kill');
@@ -88,7 +88,7 @@ test('two hits on one tick from two owners kill a two-armor truck and credit the
 test('respawn returns to the last checkpoint with an empty slot and invulnerability that ignores mines', () => {
   let s = racing(1, 2);
   const dead = { ...s.trucks[0], respawnAtTick: 101, checkpoint: 0, item: 'shield' as const };
-  s = { ...s, trucks: [dead, s.trucks[1]], mines: [{ id: 1, owner: 1, x: track.checkpoints[track.checkpoints.length - 1].mid.x, y: track.checkpoints[track.checkpoints.length - 1].mid.y, droppedTick: 0 }] };
+  s = { ...s, trucks: [dead, s.trucks[1]], mines: [{ id: 1, owner: 1, x: track.checkpoints[track.checkpoints.length - 1].mid.x, y: track.checkpoints[track.checkpoints.length - 1].mid.y, droppedTick: 0, onBridge: false }] };
   const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
   const t = r.state.trucks[0];
   assert.equal(t.respawnAtTick, 0);
@@ -100,7 +100,7 @@ test('respawn returns to the last checkpoint with an empty slot and invulnerabil
 });
 
 test('a missile sweeps its path, so it cannot tunnel through a truck it overlaps', () => {
-  const m = { id: 1, owner: 0, x: 590, y: 518, heading: 0, launchedTick: 80, target: null };
+  const m = { id: 1, owner: 0, x: 590, y: 518, heading: 0, launchedTick: 80, target: null, onBridge: false };
   const victim = at(createTruck(1, 0, 0, 0), 600, 500);
   assert.equal(stepMissiles([m], [victim], { ...track, walls: [] }, 100).hits.length, 1);
 });
@@ -122,8 +122,8 @@ test('a mine and a missile hitting on one tick resolve in launch order', () => {
   let s = racing(1, 3);
   const victim = at(s.trucks[2], 900, 830, 0, { armor: 2 });
   s = { ...s, trucks: [at(s.trucks[0], 820, 830, 0), at(s.trucks[1], 980, 830, Math.PI), victim],
-    mines: [{ id: 5, owner: 0, x: 900, y: 830, droppedTick: 0 }],
-    missiles: [{ id: 2, owner: 1, x: 905, y: 830, heading: Math.PI, launchedTick: 0, target: 2 }], nextId: 6 };
+    mines: [{ id: 5, owner: 0, x: 900, y: 830, droppedTick: 0, onBridge: false }],
+    missiles: [{ id: 2, owner: 1, x: 905, y: 830, heading: Math.PI, launchedTick: 0, target: 2, onBridge: false }], nextId: 6 };
   const r = step(s, [NEUTRAL_INPUT, NEUTRAL_INPUT, { ...NEUTRAL_INPUT, brake: true }], track);
   const kill = r.events.find((e) => e.type === 'kill') as { by: number } | undefined;
   assert.equal(kill?.by, 0, 'mine id 5 launched after missile id 2, so the mine lands the final hit');
@@ -137,7 +137,7 @@ test('toxic cannot kill and a finished truck cannot be hit', () => {
   assert.equal(s.trucks[0].armor, 1);
   assert.equal(s.trucks[0].respawnAtTick, 0);
   let f = racing(1, 2);
-  f = { ...f, trucks: [at(f.trucks[0], 900, 830, 0, { finishedTick: 50 }), f.trucks[1]], mines: [{ id: 1, owner: 1, x: 900, y: 830, droppedTick: 0 }] };
+  f = { ...f, trucks: [at(f.trucks[0], 900, 830, 0, { finishedTick: 50 }), f.trucks[1]], mines: [{ id: 1, owner: 1, x: 900, y: 830, droppedTick: 0, onBridge: false }] };
   const r = step(f, [NEUTRAL_INPUT, NEUTRAL_INPUT], track);
   assert.equal(r.events.filter((e) => e.type === 'hit').length, 0);
 });

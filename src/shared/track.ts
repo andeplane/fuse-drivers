@@ -1,7 +1,8 @@
 import { config, SURFACE_KINDS, type SurfaceKind } from './config.ts';
 
 export interface Point { x: number; y: number }
-export interface Segment { a: Point; b: Point }
+export interface Segment { a: Point; b: Point; /** Ignored while a truck is on a bridge (ADR 003). */ under?: boolean; /** Deck railing: ignored by trucks that are not on the bridge. */ deck?: boolean }
+export interface Bridge { x0: number; y0: number; x1: number; y1: number; /** Side of the rectangle whose crossing sets onBridge. */ entry: 'left' | 'right' | 'top' | 'bottom' }
 export interface Checkpoint { a: Point; b: Point; mid: Point }
 export interface Spawn extends Point { heading: number }
 
@@ -18,6 +19,7 @@ export interface Track {
   spawns: Spawn[];
   waypoints: Point[];
   items: Point[];
+  bridges: Bridge[];
 }
 
 type Json = Record<string, unknown>;
@@ -92,8 +94,10 @@ export function parseTrack(input: unknown, name = 'track'): Track {
   for (const o of objects(input, 'walls', true)) {
     const pts = points(o, 'polyline') ?? points(o, 'polygon');
     if (!pts || pts.length < 2) throw new Error('track: wall objects must be polylines or polygons');
-    for (let i = 1; i < pts.length; i++) walls.push({ a: pts[i - 1], b: pts[i] });
-    if (o.polygon) walls.push({ a: pts[pts.length - 1], b: pts[0] });
+    const flag = (name: string) => (Array.isArray(o.properties) ? (o.properties as unknown[]) : []).some((p) => isObj(p) && p.name === name && p.value === true) || undefined;
+    const under = flag('under'), deck = flag('deck');
+    for (let i = 1; i < pts.length; i++) walls.push({ a: pts[i - 1], b: pts[i], under, deck });
+    if (o.polygon) walls.push({ a: pts[pts.length - 1], b: pts[0], under, deck });
   }
 
   const checkpoints = objects(input, 'checkpoints', true).map((o, i) => {
@@ -121,7 +125,15 @@ export function parseTrack(input: unknown, name = 'track'): Track {
 
   const items = objects(input, 'items', false).map((o) => ({ x: num(o.x, 'item x'), y: num(o.y, 'item y') }));
 
-  return { name, cols, rows, tile, surface, walls, checkpoints, spawns, waypoints, items };
+  const bridges = objects(input, 'bridges', false).map((o) => {
+    const x0 = num(o.x, 'bridge x'), y0 = num(o.y, 'bridge y');
+    const props = Array.isArray(o.properties) ? (o.properties as unknown[]) : [];
+    const entry = props.find((p): p is Json => isObj(p) && p.name === 'entry')?.value;
+    if (entry !== 'left' && entry !== 'right' && entry !== 'top' && entry !== 'bottom') throw new Error('track: bridge needs an entry property (left|right|top|bottom)');
+    return { x0, y0, x1: x0 + num(o.width, 'bridge width'), y1: y0 + num(o.height, 'bridge height'), entry: entry as Bridge['entry'] };
+  });
+
+  return { name, cols, rows, tile, surface, walls, checkpoints, spawns, waypoints, items, bridges };
 }
 
 export function surfaceAt(track: Track, x: number, y: number): SurfaceKind {
