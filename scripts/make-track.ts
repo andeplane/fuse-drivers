@@ -9,6 +9,14 @@ import { SURFACE_KINDS as SURFACES, type SurfaceKind as Surface } from '../src/s
 type P = { x: number; y: number };
 
 interface Zone { surface: Surface; test: (p: P) => boolean }
+interface BridgeDef {
+  /** Centre of the crossing and half-size of the deck rectangle. */
+  center: P;
+  half: number;
+  /** Control-point index range [from, to] (inclusive) of the lane that runs over the deck. */
+  deck: [number, number];
+  entry: 'left' | 'right' | 'top' | 'bottom';
+}
 interface TrackDef {
   name: string;
   control: P[];
@@ -16,6 +24,7 @@ interface TrackDef {
   corners: number[];
   zones: Zone[];
   items: P[];
+  bridge?: BridgeDef;
 }
 
 const dist = (a: P, b: P) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -71,15 +80,48 @@ function distToPolyline(p: P, line: P[], closed: boolean): number {
   return best;
 }
 
-/** Offset a closed centerline by `d` (sign picks the side), dropping points that fold back on tight corners. */
-function offset(center: P[], d: number): P[] {
+type Tagged = P & { src: number };
+/** Offset a closed centerline by `d` (sign picks the side), dropping points that fold back on tight corners. Keeps the source sample index. */
+function offset(center: P[], d: number): Tagged[] {
   const n = center.length;
   const raw = center.map((p, i) => {
     const a = center[(i - 1 + n) % n], b = center[(i + 1) % n];
     const tx = b.x - a.x, ty = b.y - a.y, len = Math.hypot(tx, ty) || 1;
-    return { x: p.x - (ty / len) * d, y: p.y + (tx / len) * d };
+    return { x: p.x - (ty / len) * d, y: p.y + (tx / len) * d, src: i };
   });
   return raw.filter((p) => distToPolyline(p, center, true) >= Math.abs(d) - 1);
+}
+
+/** Split a wall ring into plain, `under` and `deck` polylines around a bridge crossing. */
+function splitRing(ring: Tagged[], def: TrackDef, perSegment: number, center: P[]): { pts: P[]; tag?: 'under' | 'deck' }[] {
+  const b = def.bridge;
+  if (!b) return [{ pts: ring }];
+  const inRegion = (p: P) => Math.abs(p.x - b.center.x) <= b.half && Math.abs(p.y - b.center.y) <= b.half;
+  const onDeck = (p: Tagged) => p.src >= b.deck[0] * perSegment && p.src <= (b.deck[1] + 1) * perSegment;
+  // A railing is only exempt for ground trucks where it actually crosses the under lane, and an under wall only where it
+  // crosses the deck lane; elsewhere inside the region the walls stay solid so nobody slips out through the corners.
+  const deckLane = center.filter((_, i) => i >= b.deck[0] * perSegment && i <= (b.deck[1] + 1) * perSegment);
+  const underLane = center.filter((p, i) => inRegion(p) && !(i >= b.deck[0] * perSegment && i <= (b.deck[1] + 1) * perSegment));
+  const nearLane = (p: P, lane: P[]) => lane.some((q) => Math.hypot(q.x - p.x, q.y - p.y) <= HALF_WIDTH + 12);
+  const tagOf = (p: Tagged): 'under' | 'deck' | undefined => {
+    if (!inRegion(p)) return undefined;
+    if (onDeck(p)) return nearLane(p, underLane) ? 'deck' : undefined;
+    return nearLane(p, deckLane) ? 'under' : undefined;
+  };
+  const out: { pts: P[]; tag?: 'under' | 'deck' }[] = [];
+  const n = ring.length;
+  // Start at a point outside the region so runs do not wrap awkwardly.
+  let start = ring.findIndex((p) => !inRegion(p));
+  if (start < 0) start = 0;
+  let run: P[] = [], tag = tagOf(ring[start]);
+  for (let k = 0; k <= n; k++) {
+    const p = ring[(start + k) % n];
+    const t = tagOf(p);
+    if (t !== tag && run.length) { run.push(p); out.push({ pts: run, tag }); run = []; tag = t; }
+    run.push(p);
+  }
+  if (run.length > 1) out.push({ pts: run, tag });
+  return out;
 }
 
 function build(def: TrackDef) {
@@ -123,7 +165,12 @@ function build(def: TrackDef) {
     const s1 = rayToWalls(p, n), s2 = rayToWalls(p, { x: -n.x, y: -n.y });
     return [{ x: p.x + n.x * s1, y: p.y + n.y * s1 }, { x: p.x - n.x * s2, y: p.y - n.y * s2 }];
   };
-  const walls = [poly('outer', outer, 'polygon'), poly('inner', inner, 'polygon')];
+  const walls = [...splitRing(outer, def, 12, center), ...splitRing(inner, def, 12, center)].map((w, k) => {
+    const o = poly(`wall${k}`, w.pts, def.bridge ? 'polyline' : 'polygon') as Record<string, unknown>;
+    if (w.tag) o.properties = [{ name: w.tag, type: 'bool', value: true }];
+    return o;
+  });
+  const bridges = def.bridge ? [{ id: id++, name: 'deck', x: def.bridge.center.x - def.bridge.half, y: def.bridge.center.y - def.bridge.half, width: def.bridge.half * 2, height: def.bridge.half * 2, rotation: 0, visible: true, properties: [{ name: 'entry', type: 'string', value: def.bridge.entry }] }] : [];
   const checkpoints = [...def.corners.map((ci, k) => poly(`cp${k + 1}`, perp(ci * 12), 'polyline')), poly('finish', perp(0), 'polyline')];
 
   const start = def.control[0];
@@ -143,7 +190,7 @@ function build(def: TrackDef) {
       tiles: SURFACES.map((s, i) => ({ id: i, properties: [{ name: 'surface', type: 'string', value: s }] })) }],
     layers: [
       { id: id++, name: 'surface', type: 'tilelayer', width: COLS, height: ROWS, data, visible: true, opacity: 1, x: 0, y: 0 },
-      group('walls', walls), group('checkpoints', checkpoints), group('spawns', spawns), group('waypoints', waypoints), group('items', items),
+      group('walls', walls), group('checkpoints', checkpoints), group('spawns', spawns), group('waypoints', waypoints), group('items', items), group('bridges', bridges),
     ],
   };
 }
@@ -171,7 +218,27 @@ const sump: TrackDef = {
   items: [{ x: 1100, y: 785 }, { x: 1100, y: 815 }, { x: 1100, y: 845 }],
 };
 
-for (const def of [refinery, sump]) {
+/** Sidewinder: figure-eight with an orthogonal bridge crossing at (800,500), mud in the left loop, oil at the crossing exit (PLAN.md). */
+const sidewinder: TrackDef = {
+  name: 'sidewinder',
+  control: [
+    { x: 1240, y: 840 }, { x: 1400, y: 800 }, { x: 1500, y: 680 }, { x: 1500, y: 400 }, { x: 1350, y: 200 },
+    { x: 1100, y: 170 }, { x: 1000, y: 330 }, { x: 930, y: 500 }, { x: 800, y: 500 }, { x: 620, y: 510 },
+    { x: 380, y: 640 }, { x: 170, y: 560 }, { x: 140, y: 340 }, { x: 320, y: 180 }, { x: 560, y: 180 },
+    { x: 760, y: 300 }, { x: 800, y: 420 }, { x: 800, y: 500 }, { x: 830, y: 630 }, { x: 900, y: 760 }, { x: 1000, y: 840 },
+  ],
+  corners: [2, 4, 6, 10, 12, 13, 15, 19],
+  zones: [
+    { surface: 'boost', test: inRect(1270, 790, 1330, 890) },
+    { surface: 'mud', test: inCircle({ x: 300, y: 640 }, 70) },
+    { surface: 'oil', test: inCircle({ x: 830, y: 650 }, 40) },
+    { surface: 'toxic', test: inCircle({ x: 1310, y: 300 }, 50) },
+  ],
+  items: [{ x: 1200, y: 150 }, { x: 1200, y: 180 }, { x: 1200, y: 210 }],
+  bridge: { center: { x: 800, y: 500 }, half: 70, deck: [16, 17], entry: 'top' },
+};
+
+for (const def of [refinery, sump, sidewinder]) {
   writeFileSync(`tracks/${def.name}.tmj`, JSON.stringify(build(def)));
   console.log(`wrote tracks/${def.name}.tmj`);
 }
