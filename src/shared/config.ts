@@ -35,7 +35,7 @@ export const config = {
   tile: 32,
   laps: 4,
   countdownTicks: 90,
-  raceEndGraceTicks: 240,
+  raceEndGraceTicks: 360,
   truck: {
     radius: 14,
     turnRateLow: deg(270),
