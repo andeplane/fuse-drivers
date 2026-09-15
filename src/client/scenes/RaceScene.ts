@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_STATS, config, SURFACE_KINDS } from '../../shared/config.ts';
 import type { RaceEvent } from '../../shared/race.ts';
+import { dronePosition } from '../../shared/items.ts';
 import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
 import type { Track } from '../../shared/track.ts';
 import { createKeyboard } from '../input/keyboard.ts';
@@ -36,6 +37,8 @@ export class RaceScene extends Phaser.Scene {
   boxes: Phaser.GameObjects.Sprite[] = [];
   missiles = new Map<number, Phaser.GameObjects.Image>();
   mines = new Map<number, Phaser.GameObjects.Image>();
+  oils = new Map<number, Phaser.GameObjects.Image>();
+  drones = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
   readInput!: ReturnType<typeof createKeyboard>;
   finishedAt = 0;
@@ -47,6 +50,8 @@ export class RaceScene extends Phaser.Scene {
     this.finishedAt = 0;
     this.missiles.clear();
     this.mines.clear();
+    this.oils.clear();
+    this.drones.clear();
     const bots = Object.fromEntries(BOT_LEVELS.map((d, i) => [i + 1, d]));
     this.runner = createRaceRunner(this.track, data.seed, Array(5).fill(BASE_STATS), bots);
     this.readInput = createKeyboard(this);
@@ -101,7 +106,12 @@ export class RaceScene extends Phaser.Scene {
         const boom = this.add.sprite(t.x, t.y, 'explosion', 0).setScale(SPRITE_SCALE * 2.2).setDepth(20).play('explode');
         boom.once('animationcomplete', () => boom.destroy());
       }
-      if (e.type === 'hit' && !e.absorbed) this.tweens.add({ targets: this.sprites[e.slot], angle: 360, duration: cfg.truck.spinOutTicks * (1000 / 30), onComplete: () => this.sprites[e.slot].setAngle(0) });
+      if (e.type === 'fire' && e.item === 'emp') {
+        const t = state.trucks[e.slot];
+        const ring = this.add.image(t.x, t.y, 'projectiles', FRAMES.projectiles.emp).setScale(0.2).setDepth(19);
+        this.tweens.add({ targets: ring, scale: (cfg.items.emp.range * 2) / SPRITE_CELL, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
+      }
+      if (e.type === 'hit' && !e.absorbed && e.item !== 'drone' && e.item !== 'emp') this.tweens.add({ targets: this.sprites[e.slot], angle: 360, duration: cfg.truck.spinOutTicks * (1000 / 30), onComplete: () => this.sprites[e.slot].setAngle(0) });
     }
     const poses = renderSnapshot(this.runner.previous, state, this.runner.alpha);
     this.marks.clear();
@@ -111,10 +121,13 @@ export class RaceScene extends Phaser.Scene {
       this.sprites[i].setPosition(p.x, p.y).setFrame(headingFrame(p.heading)).setScale(TRUCK_SCALE * (air ? 1.25 : 1)).setVisible(!t.respawnAtTick);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
       if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
+      this.sprites[i].setTint(state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
       if (t.lockedUntilTick > state.tick && !t.respawnAtTick) this.drawLock(p.x, p.y);
     });
     syncSet(this.missiles, state.missiles, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.missile).setScale(SPRITE_SCALE * 0.6).setDepth(9), (img, m) => img.setPosition(m.x, m.y).setRotation(m.heading + Math.PI / 2));
     syncSet(this.mines, state.mines, (m) => this.add.image(m.x, m.y, 'projectiles', FRAMES.projectiles.mineUnarmed).setScale(SPRITE_SCALE * 0.7).setDepth(3), (img, m) => img.setFrame(state.tick - m.droppedTick >= cfg.items.mine.armTicks && state.tick % 10 < 5 ? FRAMES.projectiles.mineArmed : FRAMES.projectiles.mineUnarmed));
+    syncSet(this.oils, state.oils, (o) => this.add.image(o.x, o.y, 'projectiles', FRAMES.projectiles.oil).setScale((cfg.items.oil.radius * 2) / SPRITE_CELL).setDepth(2), (img, o) => img.setAlpha(Math.min(1, (cfg.items.oil.lifeTicks - (state.tick - o.droppedTick)) / 60)));
+    syncSet(this.drones, state.drones, () => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.drone).setScale(SPRITE_SCALE * 0.8).setDepth(13), (img, d) => { const p = dronePosition(d, state.trucks[d.owner], state.tick + this.runner.alpha); img.setPosition(p.x, p.y).setRotation(state.tick * 0.5); });
     this.boxes.forEach((b, i) => b.setAlpha(state.tick < state.boxCooldowns[i * state.trucks.length] ? 0.4 : 1));
   }
 

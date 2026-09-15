@@ -8,7 +8,7 @@ export const TILE_PX = 128;
 export const SPRITE_CELL = 128;
 /** Frame indices in the split strips (see scripts/build-assets.py output). */
 export const FRAMES = {
-  projectiles: { missile: 0, mineArmed: 2, mineUnarmed: 3, shield: 5 },
+  projectiles: { missile: 0, mineArmed: 2, mineUnarmed: 3, drone: 4, shield: 5, oil: 6, emp: 7 },
   icons: { missile: 0, mine: 1, oil: 2, nitro: 3, shield: 4, drone: 5, emp: 6, empty: 7 },
   explosionFrames: [0, 1, 2, 3, 4],
 } as const;
