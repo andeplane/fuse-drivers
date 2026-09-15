@@ -26,7 +26,7 @@ All rules and numbers live in the ADRs, and once `src/shared/config.ts` exists, 
 
 ## The race
 
-1–5 trucks, 4 laps of roughly 12–15 s on a 1024×512 world that is always fully visible, zoomed to fill the screen below the HUD. Standing start in reverse championship order, 3-2-1 countdown with a rocket-start window. Race ends when the leader finishes plus 12 s; stragglers rank by progress. Placement points 5/3/2/1/0.
+1–5 trucks, 4 laps of roughly 12–15 s on a 1024×512 world that is always fully visible, zoomed to fill the screen below the HUD. Standing start in reverse championship order, 3-2-1 countdown with a rocket-start window. Race ends when the leader finishes plus 30 s (was 12 s, which left about half the field DNF at the new scale); stragglers rank by progress. Placement points 5/3/2/1/0.
 
 ## Tracks
 

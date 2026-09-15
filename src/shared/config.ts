@@ -41,7 +41,8 @@ export const config = {
   tile: 32,
   laps: 4,
   countdownTicks: 90,
-  raceEndGraceTicks: 360,
+  /** 30 s after the leader finishes: at 12-17 s laps a 12 s grace left 37-52 % of the field DNF. */
+  raceEndGraceTicks: 900,
   truck: {
     radius: 14,
     turnRateLow: deg(270),
