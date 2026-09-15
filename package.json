@@ -14,13 +14,19 @@
     "test": "tsx --test tests/*.test.ts",
     "sim": "tsx scripts/sim.ts",
     "assets": "python3 scripts/build-assets.py",
-    "tracks": "tsx scripts/make-track.ts"
+    "tracks": "tsx scripts/make-track.ts",
+    "server": "tsx watch src/server/main.ts",
+    "start": "vite build && tsx src/server/main.ts"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "phaser": "^3.90.0",
+    "qrcode": "^1.5.4",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vite": "^7.3.6"
