@@ -41,6 +41,8 @@ interface Party {
   events: RaceEvent[];
   resultsAt: number;
   shopUntil: number;
+  /** Seats that had a phone when the current race started; the others are bots until the next race. */
+  raceSlots: Set<number>;
 }
 const parties = new Map<string, Party>();
 
@@ -64,7 +66,8 @@ function lanAddress(): string {
   return 'localhost';
 }
 
-const padView = (p: Party, slot: number) => ({ t: 'phase', phase: p.phase, slot, driver: p.series?.drivers[slot], shopUntil: p.phase === 'shop' ? p.shopUntil : 0, ready: p.room.seats.find((s) => s.slot === slot)?.ready ?? false });
+// A phone that joined mid-race waits: the runner's bots were fixed when the race started.
+const padView = (p: Party, slot: number) => ({ t: 'phase', phase: p.phase === 'race' && !p.raceSlots.has(slot) ? 'lobby' : p.phase, slot, driver: p.series?.drivers[slot], shopUntil: p.phase === 'shop' ? p.shopUntil : 0, ready: p.room.seats.find((s) => s.slot === slot)?.ready ?? false });
 const syncPads = (p: Party) => { for (const [ws, slot] of p.pads) send(ws, padView(p, slot)); };
 const syncSeats = (p: Party) => toHosts(p, { t: 'seats', seats: seatsView(p) });
 const phaseMessage = (p: Party) =>
@@ -84,6 +87,7 @@ function startRace(p: Party) {
   const seated = new Set(p.room.seats.map((s) => s.slot));
   // Bots fill empty seats (ADR 008), using the single-player levels for slots 1..4.
   const bots = Object.fromEntries(series.drivers.filter((d) => !seated.has(d.slot)).map((d) => [d.slot, BOT_LEVELS[(d.slot + BOT_LEVELS.length - 1) % BOT_LEVELS.length]]));
+  p.raceSlots = seated;
   p.trackName = series.tracks[series.raceIndex];
   p.runner = createRaceRunner(tracks[p.trackName], randomBytes(4).readUInt32LE(0), series.drivers.map((d) => statsFor(d.levels)), bots);
   p.final = undefined;
@@ -142,8 +146,16 @@ const server = createServer((req, res) => {
   createReadStream(file).pipe(res);
 });
 
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1024 });
+// Browsers always send Origin: only pages served from this same host may open a party socket.
+const sameOrigin = (origin: string | undefined, host: string | undefined) => {
+  if (!origin) return true;
+  try { return new URL(origin).host === host; } catch { return false; }
+};
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1024, verifyClient: ({ origin, req }: { origin: string; req: { headers: { host?: string } } }) => sameOrigin(origin, req.headers.host) });
+// An oversized or malformed frame emits 'error'; without a listener Node would crash and end every room.
+wss.on('error', (e) => console.error('socket server:', e.message));
 wss.on('connection', (ws) => {
+  ws.on('error', () => ws.terminate());
   let party: Party | undefined, role: 'host' | 'pad' | undefined, slot = -1;
   let windowStart = Date.now(), count = 0;
   ws.on('message', (data, isBinary) => {
@@ -161,7 +173,7 @@ wss.on('connection', (ws) => {
         if (!p) {
           if (parties.size >= MAX_ROOMS) { send(ws, { t: 'error', reason: 'server full' }); return; }
           const code = newCode();
-          p = { room: createRoom(code), key: token(), phase: 'lobby', hosts: new Set(), pads: new Map(), created: now, lastActive: now, lastSentTick: 0, events: [], resultsAt: 0, shopUntil: 0 };
+          p = { room: createRoom(code), key: token(), phase: 'lobby', hosts: new Set(), pads: new Map(), created: now, lastActive: now, lastSentTick: 0, events: [], resultsAt: 0, shopUntil: 0, raceSlots: new Set() };
           parties.set(code, p);
         }
         party = p;
