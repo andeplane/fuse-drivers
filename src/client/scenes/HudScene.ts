@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { config } from '../../shared/config.ts';
+import { config, TICK_RATE } from '../../shared/config.ts';
 import type { RaceEvent } from '../../shared/race.ts';
 import type { RaceScene } from './RaceScene.ts';
 import { FRAMES } from './BootScene.ts';
@@ -52,13 +52,13 @@ export class HudScene extends Phaser.Scene {
     const me = s.trucks[0];
     this.lap.setText(`LAP ${Math.min(me.laps + 1, config.laps)}/${config.laps}`);
     this.pos.setText(`POS ${s.placements.indexOf(0) + 1}/${s.trucks.length}`);
-    const secs = Math.max(0, (s.tick - s.countdownEndTick) / 30);
+    const secs = Math.max(0, (s.tick - s.countdownEndTick) / TICK_RATE);
     this.clock.setText(`${Math.floor(secs / 60)}:${(secs % 60).toFixed(1).padStart(4, '0')}`);
     this.status.setText(`NITRO ${'▲'.repeat(me.nitros)}  ARMOR ${'█'.repeat(me.armor)}${'░'.repeat(me.stats.maxArmor - me.armor)}  ${Math.round(me.speed)} u/s`);
     this.slot.setFrame(me.item ? FRAMES.icons[me.item] : FRAMES.icons.empty);
     this.kills.setText(`KILLS ${me.kills}`);
     if (s.phase === 'countdown') {
-      const left = Math.ceil((s.countdownEndTick - s.tick) / 30);
+      const left = Math.ceil((s.countdownEndTick - s.tick) / TICK_RATE);
       this.big.setText(String(left)).setAlpha(1);
     } else if (s.phase === 'finished') {
       this.big.setText(`P${(this.race.final ?? s).placements.indexOf(0) + 1}`).setAlpha(1);

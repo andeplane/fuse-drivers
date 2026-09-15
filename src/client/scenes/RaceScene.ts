@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { config, SURFACE_KINDS } from '../../shared/config.ts';
+import { config, SURFACE_KINDS, TICK_MS } from '../../shared/config.ts';
 import { applyRace, statsFor, type Series } from '../../shared/series.ts';
 import type { RaceEvent, RaceState } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
@@ -133,7 +133,7 @@ export class RaceScene extends Phaser.Scene {
         const sprite = this.sprites[e.slot];
         this.tweens.killTweensOf(sprite);
         sprite.setAngle(0);
-        this.tweens.add({ targets: sprite, angle: 360, duration: cfg.truck.spinOutTicks * (1000 / 30), onComplete: () => sprite.setAngle(0) });
+        this.tweens.add({ targets: sprite, angle: 360, duration: cfg.truck.spinOutTicks * TICK_MS, onComplete: () => sprite.setAngle(0) });
       }
     }
     const poses = renderSnapshot(this.runner.previous, state, this.runner.alpha);

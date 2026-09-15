@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { config } from '../../shared/config.ts';
+import { config, TICK_RATE } from '../../shared/config.ts';
 import type { RaceState } from '../../shared/race.ts';
 import { standings, type Series } from '../../shared/series.ts';
 import type { Track } from '../../shared/track.ts';
@@ -19,7 +19,7 @@ export class ResultsScene extends Phaser.Scene {
     data.state.placements.forEach((slot, i) => {
       const t = data.state.trucks[slot];
       const name = slot === 0 ? 'YOU' : `BOT ${slot}`;
-      const time = t.finishedTick ? `${((t.finishedTick - data.state.countdownEndTick) / 30).toFixed(1)}s` : 'DNF';
+      const time = t.finishedTick ? `${((t.finishedTick - data.state.countdownEndTick) / TICK_RATE).toFixed(1)}s` : 'DNF';
       const line = `${i + 1}.  ${name.padEnd(6)}  ${time.padStart(7)}   ${config.points[i]} pts   $${config.prize[i] + t.kills * config.killBonus}   kills ${t.kills}`;
       this.add.text(width / 2 - 200, 200 + i * 60, line, { ...FONT, fontSize: '32px', color: COLOR_HEX[TRUCK_COLORS[slot]] }).setOrigin(0.5);
     });
