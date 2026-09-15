@@ -33,3 +33,7 @@ A client review (src/client) was in flight; results were not received. Known cli
 2. Apply the client review; wire the generated HUD sheets (`public/assets` has icons; `assets/raw/hud` needs cutting into `build-assets.py`).
 3. M3: create room, QR code, phones as controllers, runner in a Node server (ADR 008).
 4. M5 polish: sound, touch, attract screen.
+
+## Uncommitted working tree at handover
+
+`src/shared/bot.ts` has uncommitted edits from the in-flight bot-robustness agent (session ended before it finished). Run `git diff src/shared/bot.ts`, then `npm test` and `npm run sim -- --races 8 --track sidewinder` (and the other layouts). Keep the diff if it reduces failures without breaking refinery; otherwise `git checkout src/shared/bot.ts` and start from the diagnosis notes above.
