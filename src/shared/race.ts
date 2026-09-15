@@ -72,10 +72,11 @@ function resolveWalls(t: Truck, from: Point, track: Track, wasTouching: boolean)
       const tunneled = crosses(from, { x, y }, w);
       if (d >= r && !tunneled) continue;
       touched = true;
-      const nowSide = Math.sign(ex * (y - w.a.y) - ey * (x - w.a.x)) || startSide;
       const len = Math.hypot(ex, ey) || 1;
       const nx = (-ey / len) * startSide, ny = (ex / len) * startSide;
-      if (tunneled || nowSide !== startSide || d < 1e-9) { x = c.x + nx * r; y = c.y + ny * r; continue; }
+      // Snap back to the start side only when the path really crossed this segment. Crossing just the infinite line beside a
+      // short segment (the sharp tip of a hairpin barrier) would otherwise throw the truck through the neighbouring segments.
+      if (tunneled || d < 1e-9) { x = c.x + nx * r; y = c.y + ny * r; continue; }
       x += (dx / d) * (r - d);
       y += (dy / d) * (r - d);
     }
