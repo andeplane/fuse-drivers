@@ -21,6 +21,10 @@ The user judged the game "terrible" against the chosen concept: tiny trucks on t
 
 The user set the goal "do not stop until it is great quality" and described the original as tilted, so style-06 is the working direction. In place: 16-direction trucks from the elevated camera (`assets/raw/trucks-tilted/README.md`, left half mirrored), grandstand band and side crowds drawn by `HudScene.drawStands` in screen space (`STANDS` in `RaceScene` sets the margins), fence with sponsor boards, cube item boxes, raised barriers, barrier-ringed toxic pools, wooden ramps, mogul mounds, ground shadows, frame-cycling spin-outs. Results and Shop are proper tables; every menu screen uses `backdrop()`. `window.game` exists in dev builds for browser checks (screenshots fail while the Browser pane is hidden; read scene state instead).
 
+## Review fixes and rules (after the tilted look)
+
+A background review of the whole session found seven issues, all fixed with commits: party server crash on an oversized frame, no Origin check, lobby seats never freed, a reloaded phone's inputs dropped (sequence not reset), the party shop clock listener leaking and freezing the second shop, touch slides between buttons dropping the press, and the party HUD armor bar following truck 0. Race end grace is now 30 s after the leader (12 s left about half the field DNF at the new scale). Results, Shop, phone page and touch buttons were restyled; mud, water, oil and tarmac got proper art; wrecks stay as charred hulks.
+
 ## Open
 
 1. Still short of the concept: the in-world edge decor (pipes, tanks) is soft; truck wrecks are a darkened truck frame rather than a wreck sprite.
