@@ -30,6 +30,9 @@ export const BASE_STATS: TruckStats = {
   mass: 1,
 };
 
+/** Bot difficulty for slots 1..4; slot 0 is the human. */
+export const BOT_LEVELS = ['hard', 'normal', 'easy', 'hard'] as const;
+
 export const config = {
   world: { width: 1600, height: 900 },
   tile: 32,

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { config, SURFACE_KINDS, TICK_MS } from '../../shared/config.ts';
+import { BOT_LEVELS, config, SURFACE_KINDS, TICK_MS } from '../../shared/config.ts';
 import { applyRace, statsFor, type Series } from '../../shared/series.ts';
 import type { RaceEvent, RaceState } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
@@ -13,7 +13,6 @@ import { config as cfg } from '../../shared/config.ts';
 
 /** World units per sprite cell: a truck is about 44 u long and the source fills ~95 % of its cell. */
 const TRUCK_SCALE = 46 / (TRUCK_CELL * 0.95);
-const BOT_LEVELS = ['hard', 'normal', 'easy', 'hard'] as const;
 /** World units per sprite pixel for the 128 px item cells: a mine or box is about 36 u across. */
 const SPRITE_SCALE = 36 / SPRITE_CELL;
 
