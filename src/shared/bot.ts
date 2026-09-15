@@ -29,11 +29,12 @@ export function createBotMemory(seed: number, slot: number): BotMemory {
   return { queue: [], lateral, anchorX: 0, anchorY: 0, anchorTick: 0, reverseUntilTick: 0 };
 }
 
-/** Nearest waypoint segment and the distance along it of the projection; full scan, the polyline is small. */
-function closestSegment(wp: Point[], p: Point): { i: number; along: number } {
+/** Nearest waypoint segment among `count` segments from `first`, and the distance along it of the projection. */
+function closestSegment(wp: Point[], p: Point, first: number, count: number): { i: number; along: number } {
   const n = wp.length;
-  let best = 0, bestAlong = 0, bestD = Infinity;
-  for (let i = 0; i < n; i++) {
+  let best = first % n, bestAlong = 0, bestD = Infinity;
+  for (let k = 0; k < count; k++) {
+    const i = (first + k) % n;
     const a = wp[i], b = wp[(i + 1) % n];
     const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1;
     const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
@@ -86,7 +87,12 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     return [{ ...NEUTRAL_INPUT, nitro: state.tick >= state.countdownEndTick - config.truck.rocketStartWindow }, memory];
   }
   const wp = track.waypoints;
-  const { i: segment, along } = closestSegment(wp, t);
+  // Only the stretch of the polyline between the last and the next checkpoint counts, so where the line
+  // crosses itself (a bridge) the bot never follows the other level's branch through an under or deck wall.
+  const cps = track.checkpoints, n = cps.length;
+  const crossing = (c: number) => wp.findIndex((a, i) => crosses(a, wp[(i + 1) % wp.length], cps[(c + n) % n]));
+  const from = crossing(t.checkpoint - 1), to = crossing(t.checkpoint);
+  const { i: segment, along } = from < 0 || to < 0 ? closestSegment(wp, t, 0, wp.length) : closestSegment(wp, t, from, ((to - from + wp.length) % wp.length) + 1);
   // Shorten the lookahead until the target is visible, so a hairpin never aims through its inside wall.
   const visible = (p: Point) => !track.walls.some((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge) && crosses(t, p, w));
   let target = t as Point;
@@ -105,11 +111,12 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   }
   const airborneOrSpun = state.tick < t.airborneUntilTick || state.tick < t.spinUntilTick;
   // Wedged against a wall with the throttle on (still within 20 u of where it was a second ago, oscillating included):
-  // back out for a second, steering away from the target.
+  // back out for a second.
   let { anchorX, anchorY, anchorTick, reverseUntilTick } = memory;
   if (state.tick - anchorTick >= 30) {
     const wedged = t.wallTicks >= 30 && Math.hypot(t.x - anchorX, t.y - anchorY) < 20 && !airborneOrSpun;
     if (wedged && state.tick >= reverseUntilTick) reverseUntilTick = state.tick + 30;
+    anchorX = t.x; anchorY = t.y; anchorTick = state.tick;
   }
   // Facing the wrong way for a second while pressed against a wall (blocked at a crossing): back out and swing round.
   if (t.wrongWayTicks >= 30 && t.wallTicks >= 10 && state.tick >= reverseUntilTick && !airborneOrSpun) {
@@ -118,7 +125,9 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   }
   const nextMemory = { ...memory, anchorX, anchorY, anchorTick, reverseUntilTick };
   if (state.tick < reverseUntilTick) {
-    const backOut: TruckInput = { ...NEUTRAL_INPUT, brake: true, left: err > 0, right: err < 0 };
+    // Reverse with the nose swinging towards the target (heading turns the same way at any speed), so the
+    // truck drives out of the corner rather than back into it.
+    const backOut: TruckInput = { ...NEUTRAL_INPUT, brake: true, left: err < -STEER_DEADBAND, right: err > STEER_DEADBAND };
     return [backOut, nextMemory];
   }
   const decided: TruckInput = {
