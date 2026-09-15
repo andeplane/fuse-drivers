@@ -26,11 +26,14 @@ Balance values live in `src/shared/config.ts` once it exists; docs link to it ra
 - For UI changes, exercise the affected browser flow. Documentation-only edits need a diff check, not game tests.
 - Report what was actually tested and any remaining limits.
 
+`npm run sim -- --races 30` runs full bot races headless at a few hundred times realtime with invariant checks (finite numbers, inside world, armor floor, stuck trucks). Run it after any change to the simulation, bots or tracks; it finds what unit tests miss. Add an invariant there when you fix a bug it should have caught.
+
 Before merging to main:
 
 ```sh
 npm run typecheck
 npm test
+npm run sim
 npm run build
 ```
 

@@ -1,0 +1,55 @@
+/**
+ * Headless race simulator: full races with bots at maximum speed, invariant checks, timing stats.
+ * Usage: npm run sim -- [--races 20] [--seed 1] [--trucks 5] [--track refinery]
+ */
+import { readFileSync } from 'node:fs';
+import { BASE_STATS, config } from '../src/shared/config.ts';
+import type { Difficulty } from '../src/shared/bot.ts';
+import { createRaceRunner } from '../src/shared/runner.ts';
+import { parseTrack } from '../src/shared/track.ts';
+import { TICK_MS } from '../src/shared/config.ts';
+
+const arg = (name: string, def: string) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : def; };
+const races = Number(arg('races', '20')), seed0 = Number(arg('seed', '1')), n = Number(arg('trucks', '5'));
+const track = parseTrack(JSON.parse(readFileSync(`tracks/${arg('track', 'refinery')}.tmj`, 'utf8')), arg('track', 'refinery'));
+const levels: Difficulty[] = ['hard', 'normal', 'easy', 'hard', 'normal'];
+const MAX_TICKS = 30 * 240;
+
+let failures = 0, totalTicks = 0;
+const lapTimes: number[] = [];
+const t0 = performance.now();
+for (let r = 0; r < races; r++) {
+  const seed = seed0 + r;
+  const bots = Object.fromEntries(Array.from({ length: n }, (_, i) => [i, levels[i % levels.length]]));
+  const runner = createRaceRunner(track, seed, Array.from({ length: n }, () => BASE_STATS), bots);
+  const lastLap: number[] = Array(n).fill(0);
+  const lastProgress: number[] = Array(n).fill(0);
+  const stuckSince: number[] = Array(n).fill(0);
+  let wrongWay = 0;
+  const fail = (msg: string) => { failures++; console.log(`race ${r} seed ${seed} tick ${runner.state.tick}: ${msg}`); };
+  while (runner.state.phase !== 'finished' && runner.state.tick < MAX_TICKS) {
+    const { state, events } = runner.advance(TICK_MS, []);
+    for (const e of events) {
+      if (e.type === 'lap') { lapTimes.push((e.tick - lastLap[e.slot]) / 30); lastLap[e.slot] = e.tick; }
+      if (e.type === 'wrongWay') wrongWay++;
+    }
+    for (const t of state.trucks) {
+      for (const [k, v] of Object.entries(t)) if (typeof v === 'number' && !Number.isFinite(v)) fail(`truck ${t.slot}.${k} is ${v}`);
+      if (t.x < 0 || t.y < 0 || t.x > config.world.width || t.y > config.world.height) fail(`truck ${t.slot} outside world at ${t.x.toFixed(1)},${t.y.toFixed(1)}`);
+      if (t.armor < 1 && !t.respawnAtTick) fail(`truck ${t.slot} armor ${t.armor} while alive`);
+      if (t.progress > lastProgress[t.slot] + 1e-9) { lastProgress[t.slot] = t.progress; stuckSince[t.slot] = state.tick; }
+      else if (!t.finishedTick && state.tick - stuckSince[t.slot] > 300) { fail(`truck ${t.slot} stuck at progress ${t.progress.toFixed(2)}`); stuckSince[t.slot] = state.tick; }
+    }
+    if (state.tick > 1 && state.placements.length !== n) fail('placements length');
+  }
+  totalTicks += runner.state.tick;
+  if (runner.state.phase !== 'finished') fail(`did not finish; placements ${runner.state.placements.join(',')} laps ${runner.state.trucks.map((t) => t.laps).join(',')}`);
+  if (wrongWay) console.log(`race ${r}: ${wrongWay} wrong-way events`);
+}
+const secs = (performance.now() - t0) / 1000;
+lapTimes.sort((a, b) => a - b);
+const q = (p: number) => lapTimes[Math.floor(p * (lapTimes.length - 1))]?.toFixed(1);
+console.log(`${races} races, ${totalTicks} ticks in ${secs.toFixed(2)} s (${Math.round(totalTicks / secs)} ticks/s, ${(totalTicks / 30 / secs).toFixed(0)}x realtime)`);
+console.log(`lap time s: min ${q(0)} p50 ${q(0.5)} p90 ${q(0.9)} max ${q(1)}; race length s: ${(totalTicks / races / 30).toFixed(1)} avg`);
+console.log(failures ? `FAIL: ${failures} invariant failures` : 'OK: no invariant failures');
+process.exit(failures ? 1 : 0);

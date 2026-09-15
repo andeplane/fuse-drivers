@@ -11,7 +11,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "sim": "tsx scripts/sim.ts",
+    "assets": "python3 scripts/build-assets.py",
+    "tracks": "tsx scripts/make-track.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0"
