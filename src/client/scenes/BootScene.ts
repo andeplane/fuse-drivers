@@ -23,6 +23,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    this.anims.create({ key: 'box-pulse', frames: this.anims.generateFrameNumbers('itembox', { frames: [0, 1, 2, 3] }), frameRate: 6, repeat: -1 });
+    this.anims.create({ key: 'explode', frames: this.anims.generateFrameNumbers('explosion', { frames: [...FRAMES.explosionFrames] }), frameRate: 12 });
     const tracks = Object.fromEntries(Object.entries(rawTracks).map(([path, raw]) => { const n = path.split('/').pop()!.replace('.tmj', ''); return [n, parseTrack(JSON.parse(raw), n)]; }));
     this.scene.start('Menu', { tracks });
   }

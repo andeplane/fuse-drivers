@@ -68,8 +68,6 @@ export class RaceScene extends Phaser.Scene {
       return this.add.sprite(t.x, t.y, `truck-${c}`, 0).setScale(TRUCK_SCALE).setDepth(10);
     });
     this.shields = this.sprites.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 1.6).setDepth(11).setVisible(false));
-    this.anims.create({ key: 'box-pulse', frames: this.anims.generateFrameNumbers('itembox', { frames: [0, 1, 2, 3] }), frameRate: 6, repeat: -1 });
-    this.anims.create({ key: 'explode', frames: this.anims.generateFrameNumbers('explosion', { frames: [...FRAMES.explosionFrames] }), frameRate: 12 });
     this.boxes = this.track.items.map((p) => this.add.sprite(p.x, p.y, 'itembox', 0).setScale(SPRITE_SCALE).setDepth(4).play('box-pulse'));
     this.marks = this.add.graphics().setDepth(12);
     this.scene.launch('Hud', { race: this });
