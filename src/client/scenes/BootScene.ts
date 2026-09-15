@@ -11,7 +11,6 @@ export class BootScene extends Phaser.Scene {
 
   preload() {
     this.load.image('surfaces', 'assets/surfaces.png');
-    this.load.image('infield', 'assets/infield.png');
     for (const c of TRUCK_COLORS) this.load.spritesheet(`truck-${c}`, `assets/truck-${c}.png`, { frameWidth: TRUCK_CELL, frameHeight: TRUCK_CELL });
   }
 

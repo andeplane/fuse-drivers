@@ -84,16 +84,16 @@ function offset(center: P[], d: number): P[] {
 
 function build(def: TrackDef) {
   const center = catmullRom(def.control, 12);
-  const surfaceOf = (p: P): Surface | null => {
-    if (distToPolyline(p, center, true) > HALF_WIDTH + 6) return null;
-    for (const z of def.zones) if (z.test(p)) return z.surface;
+  // The whole stadium floor is dirt, like the original; walls define the lanes. Zones only apply on the lane.
+  const surfaceOf = (p: P): Surface => {
+    if (distToPolyline(p, center, true) <= HALF_WIDTH + 6) for (const z of def.zones) if (z.test(p)) return z.surface;
     return 'dirt';
   };
   const data: number[] = [];
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++) {
       const s = surfaceOf({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 });
-      data.push(s ? SURFACES.indexOf(s) + 1 : 0);
+      data.push(SURFACES.indexOf(s) + 1);
     }
 
   let id = 1;

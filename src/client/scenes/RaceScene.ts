@@ -36,7 +36,6 @@ export class RaceScene extends Phaser.Scene {
 
   private drawTrack() {
     const { world, tile } = config;
-    this.add.tileSprite(0, 0, world.width, world.height, 'infield').setOrigin(0).setTileScale(tile / TILE_PX);
     const rows: number[][] = [];
     for (let r = 0; r < this.track.rows; r++) {
       rows.push(this.track.surface.slice(r * this.track.cols, (r + 1) * this.track.cols).map((s) => (s ? SURFACE_KINDS.indexOf(s) : -1)));

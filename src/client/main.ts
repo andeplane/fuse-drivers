@@ -9,7 +9,7 @@ new Phaser.Game({
   parent: 'game',
   width: config.world.width,
   height: config.world.height,
-  backgroundColor: '#1a2a12',
+  backgroundColor: '#6b4a24',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   render: { antialias: true, pixelArt: false, roundPixels: false },
   scene: [BootScene, RaceScene, HudScene],

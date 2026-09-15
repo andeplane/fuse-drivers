@@ -33,14 +33,13 @@ def over(base, sprite):
 dirt = texture('dirt')
 tiles = {
     'dirt': dirt, 'tarmac': texture('tarmac'), 'mud': texture('mud'), 'water': texture('water'), 'oil': texture('oil'),
-    'boost': over(dirt, cell('boost', 2, 1, 1)), 'toxic': texture('toxic'),
+    'boost': over(dirt, cell('boost', 2, 1, 1).rotate(-90, expand=True)), 'toxic': texture('toxic'),
     'mogul': over(dirt, cell('moguls', 4, 1, 0)), 'ramp': over(dirt, cell('ramp', 2, 1, 0)),
 }
 strip = Image.new('RGBA', (TILE * len(SURFACES), TILE))
 for i, s in enumerate(SURFACES): strip.paste(tiles[s], (i * TILE, 0))
 strip.save(OUT / 'surfaces.png')
 strip.resize((32 * len(SURFACES), 32), Image.LANCZOS).save(Path('tracks') / 'surfaces.png')  # lets Tiled show the surface layer
-texture('infield').save(OUT / 'infield.png')
 
 # Trucks: rotate the full-resolution source, then Lanczos to 256 px cells. Frame 0 = up, clockwise.
 for color in ['cyan', 'pink', 'lime', 'orange', 'violet']:
