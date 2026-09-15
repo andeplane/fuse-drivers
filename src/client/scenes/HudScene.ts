@@ -61,7 +61,7 @@ export class HudScene extends Phaser.Scene {
       const left = Math.ceil((s.countdownEndTick - s.tick) / 30);
       this.big.setText(String(left)).setAlpha(1);
     } else if (s.phase === 'finished') {
-      this.big.setText(`P${s.placements.indexOf(0) + 1}`).setAlpha(1);
+      this.big.setText(`P${(this.race.final ?? s).placements.indexOf(0) + 1}`).setAlpha(1);
     }
   }
 }

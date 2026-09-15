@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { config, SURFACE_KINDS } from '../../shared/config.ts';
 import { applyRace, statsFor, type Series } from '../../shared/series.ts';
-import type { RaceEvent } from '../../shared/race.ts';
+import type { RaceEvent, RaceState } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
 import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
 import { lerp } from '../../shared/truck.ts';
@@ -43,7 +43,8 @@ export class RaceScene extends Phaser.Scene {
   drones = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
   readInput!: ReturnType<typeof createKeyboard>;
-  finishedAt = 0;
+  /** State at the tick the race was first seen finished; Results and the HUD placement both use it. */
+  final?: RaceState;
   series!: Series;
   tracks!: Record<string, Track>;
   deck!: Phaser.GameObjects.Graphics;
@@ -54,7 +55,7 @@ export class RaceScene extends Phaser.Scene {
     this.series = data.series;
     this.tracks = data.tracks;
     this.track = data.tracks[data.series.tracks[data.series.raceIndex]];
-    this.finishedAt = 0;
+    this.final = undefined;
     this.missiles.clear();
     this.mines.clear();
     this.oils.clear();
@@ -112,9 +113,9 @@ export class RaceScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     const { state, events } = this.runner.advance(delta, [this.readInput()]);
-    if (state.phase === 'finished' && !this.finishedAt) {
-      this.finishedAt = this.time.now;
-      this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: this.runner.state, series: applyRace(this.series, this.runner.state), tracks: this.tracks }); });
+    if (state.phase === 'finished' && !this.final) {
+      const final = (this.final = state);
+      this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: final, series: applyRace(this.series, final), tracks: this.tracks }); });
     }
     for (const e of events) {
       this.game.events.emit('race-event', e satisfies RaceEvent);
