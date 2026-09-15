@@ -51,7 +51,7 @@ export class HudScene extends Phaser.Scene {
       this.panel(TRUCK_COLORS[i], x, TOP, chipW, TOP_H);
       this.add.image(x + 32, TOP + TOP_H / 2, 'portraits', i).setScale(46 / HUD_CELL.portraits);
       const party = this.race.party;
-      this.add.text(x + 60, TOP + 12, party ? (party.names[i] ?? `CPU${i}`).slice(0, 8).toUpperCase() : i === 0 ? 'YOU' : `CPU${i}`, { ...LABEL, color: '#ffffff' });
+      this.add.text(x + 60, TOP + 12, party ? (party.names[i] ?? `CPU${i}`).slice(0, 8).toUpperCase() : i === 0 && !this.race.attract ? 'YOU' : `CPU${i}`, { ...LABEL, color: '#ffffff' });
       return this.pips(x + 60, TOP + 44, t.stats.maxArmor, 14, 1, 2 * i);
     });
     const px = 170 + s.trucks.length * (chipW + 6);
@@ -72,6 +72,10 @@ export class HudScene extends Phaser.Scene {
     this.armor = this.pips(108, by + 72, s.trucks[0].stats.maxArmor, 22, 2, 0);
     this.speed = this.add.text(326, by + 72, '', { ...LABEL, color: '#ffffff' }).setOrigin(1, 0.5);
 
+    if (this.race.attract) {
+      const demo = this.add.text(width / 2, height - 60, 'DEMO  ·  PRESS ANY KEY', { ...FONT, fontSize: '40px', color: '#ffe600' }).setOrigin(0.5);
+      this.tweens.add({ targets: demo, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
+    }
     const series = this.race.series;
     this.add.text(width - 12, height - 10, series.tracks.length > 1 ? `RACE ${series.raceIndex + 1}/${series.tracks.length}  ${series.tracks[series.raceIndex].toUpperCase()}` : series.tracks[series.raceIndex].toUpperCase(), { ...FONT, fontSize: '20px' }).setOrigin(1, 1);
 

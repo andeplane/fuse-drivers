@@ -7,6 +7,7 @@ import { createRaceRunner, type RaceRunner } from '../../shared/runner.ts';
 import { lerp } from '../../shared/truck.ts';
 import type { Point, Segment, Track } from '../../shared/track.ts';
 import { createKeyboard } from '../input/keyboard.ts';
+import { createTouchControls } from '../input/touch.ts';
 import type { PartyData } from '../net/party.ts';
 import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
 import { FRAMES, SPRITE_CELL, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
@@ -77,22 +78,41 @@ export class RaceScene extends Phaser.Scene {
 
   /** Set when the race runs on the party server: the runner replays its snapshots and inputs come from phones. */
   party?: PartyData;
+  /** The attract demo: every truck is a bot and any input returns to the menu. */
+  attract = false;
 
   constructor() { super('Race'); }
 
-  create(data: SeriesData & { party?: PartyData }) {
+  create(data: SeriesData & { party?: PartyData; attract?: boolean }) {
     this.series = data.series;
     this.tracks = data.tracks;
     this.party = data.party;
+    this.attract = !!data.attract;
     this.track = data.tracks[data.series.tracks[data.series.raceIndex]];
     this.final = undefined;
     this.missiles.clear();
     this.mines.clear();
     this.oils.clear();
     this.drones.clear();
-    const bots = Object.fromEntries(BOT_LEVELS.map((d, i) => [i + 1, d]));
+    // The attract demo gives slot 0 to a bot as well.
+    const levels = this.attract ? (['normal', ...BOT_LEVELS] as const) : BOT_LEVELS;
+    const bots = Object.fromEntries(levels.map((d, i) => [this.attract ? i : i + 1, d]));
     this.runner = data.party?.runner ?? createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
-    this.readInput = createKeyboard(this);
+    const keyboard = createKeyboard(this);
+    this.readInput = keyboard;
+    if (this.attract) {
+      const leave = () => { this.scene.stop('Hud'); this.scene.start('Menu', { tracks: this.tracks }); };
+      this.input.keyboard!.once('keydown', leave);
+      this.input.once('pointerdown', leave);
+    } else if (!this.party && window.matchMedia('(pointer: coarse)').matches) {
+      // Solo play on a phone or tablet: on-screen buttons over the bottom of the track, merged with any keyboard.
+      const touch = createTouchControls({ overlay: true });
+      this.events.once('shutdown', () => touch.destroy());
+      this.readInput = () => {
+        const k = keyboard(), t = touch.read();
+        return { left: k.left || t.left, right: k.right || t.right, brake: k.brake || t.brake, nitro: k.nitro || t.nitro, item: k.item || t.item, itemAlt: k.itemAlt || t.itemAlt };
+      };
+    }
     this.drawTrack();
     // The world is smaller than the screen: zoom it to full width under the HUD strip, as in the concept art.
     const worldW = this.track.cols * config.tile, worldH = this.track.rows * config.tile, zoom = config.screen.width / worldW;
@@ -465,7 +485,8 @@ export class RaceScene extends Phaser.Scene {
     if (state.phase === 'finished' && !this.final) {
       const final = (this.final = state);
       // A party race moves on when the server sends the results.
-      if (!this.party) this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: final, series: applyRace(this.series, final), tracks: this.tracks }); });
+      if (this.attract) this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Menu', { tracks: this.tracks }); });
+      else if (!this.party) this.time.delayedCall(2500, () => { this.scene.stop('Hud'); this.scene.start('Results', { state: final, series: applyRace(this.series, final), tracks: this.tracks }); });
     }
     for (const e of events) {
       this.game.events.emit('race-event', e satisfies RaceEvent);
