@@ -54,7 +54,7 @@ export class HudScene extends Phaser.Scene {
     this.pos.setText(`POS ${s.placements.indexOf(0) + 1}/${s.trucks.length}`);
     const secs = Math.max(0, (s.tick - s.countdownEndTick) / TICK_RATE);
     this.clock.setText(`${Math.floor(secs / 60)}:${(secs % 60).toFixed(1).padStart(4, '0')}`);
-    this.status.setText(`NITRO ${'▲'.repeat(me.nitros)}  ARMOR ${'█'.repeat(me.armor)}${'░'.repeat(me.stats.maxArmor - me.armor)}  ${Math.round(me.speed)} u/s`);
+    this.status.setText(`NITRO ${'▲'.repeat(me.nitros)}  ARMOR ${'█'.repeat(me.armor)}${'░'.repeat(me.stats.maxArmor - me.armor)}  ${Math.round(me.speed / 10) * 10} u/s`);
     this.slot.setFrame(me.item ? FRAMES.icons[me.item] : FRAMES.icons.empty);
     this.kills.setText(`KILLS ${me.kills}`);
     if (s.phase === 'countdown') {
