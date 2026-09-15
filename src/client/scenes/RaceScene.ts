@@ -346,11 +346,35 @@ export class RaceScene extends Phaser.Scene {
       ctx.fill();
     }
 
+    // Tarmac: dark speckled asphalt, a yellow dashed centre line along the racing line, and a few skid marks.
     const tarmac = cells('tarmac');
     for (const p of tarmac) {
-      ctx.fillStyle = '#4c4c54';
+      ctx.fillStyle = '#3a3a42';
       ctx.fillRect(p.x - tile / 2, p.y - tile / 2, tile, tile);
-      for (let k = 0; k < 14; k++) { ctx.fillStyle = rand() < 0.5 ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.12)'; ctx.fillRect(p.x - tile / 2 + rand() * tile, p.y - tile / 2 + rand() * tile, 2, 2); }
+      for (let k = 0; k < 22; k++) { ctx.fillStyle = rand() < 0.5 ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.1)'; ctx.fillRect(p.x - tile / 2 + rand() * tile, p.y - tile / 2 + rand() * tile, 2, 2); }
+    }
+    if (tarmac.length) {
+      const wp = this.track.waypoints;
+      const onTarmac = (x: number, y: number) => surface[Math.floor(y / tile) * cols + Math.floor(x / tile)] === 'tarmac';
+      ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+      ctx.lineWidth = 4;
+      for (let k = 0; k < 6; k++) {
+        const p = tarmac[Math.floor(rand() * tarmac.length)];
+        ctx.beginPath();
+        ctx.moveTo(p.x - 30, p.y + (rand() - 0.5) * 30);
+        ctx.quadraticCurveTo(p.x, p.y + (rand() - 0.5) * 40, p.x + 30, p.y + (rand() - 0.5) * 30);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#f2d23a';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([12, 10]);
+      ctx.beginPath();
+      wp.forEach((a, i) => {
+        const b = wp[(i + 1) % wp.length];
+        if (onTarmac((a.x + b.x) / 2, (a.y + b.y) / 2)) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // Moguls: a row of raised dirt humps with a hard shadow and a sunlit top, like the concept's hay-bale mounds.
