@@ -49,7 +49,7 @@ const refinery: TrackDef = {
     { surface: 'toxic', test: inCircle({ x: 770, y: 264 }, 50) },
     { surface: 'toxic', test: inCircle({ x: 140, y: 379 }, 50) },
   ],
-  items: pts(300, 72, 300, 92, 300, 112),
+  items: pts(262, 70, 306, 92, 350, 114),
 };
 
 function catmullRom(pts: P[], perSegment: number): P[] {
@@ -217,7 +217,7 @@ const sump: TrackDef = {
     { surface: 'toxic', test: inCircle({ x: 886, y: 149 }, 50) },
     { surface: 'mud', test: inCircle({ x: 720, y: 207 }, 50) },
   ],
-  items: pts(400, 187, 400, 207, 400, 227),
+  items: pts(362, 185, 406, 207, 450, 229),
 };
 
 /** Sidewinder: figure-eight with an orthogonal bridge crossing at (512,322), mud in the left loop, oil at the deck exit (PLAN.md). */
@@ -231,7 +231,7 @@ const sidewinder: TrackDef = {
     { surface: 'oil', test: inCircle({ x: 500, y: 412 }, 30) },
     { surface: 'toxic', test: inCircle({ x: 330, y: 149 }, 50) },
   ],
-  items: pts(730, 72, 730, 92, 730, 112),
+  items: pts(686, 70, 730, 92, 774, 114),
   bridge: { center: { x: 512, y: 322 }, half: 60, deck: [20, 21], entry: 'top' },
 };
 
