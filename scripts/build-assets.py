@@ -125,6 +125,19 @@ def split_sheet(name, group, cell):
 
 counts = {name: split_sheet(name, 'items', 128) for name in ['itembox', 'icons', 'projectiles', 'explosion', 'markers', 'dust']}
 print('item sheets (sprites per strip):', counts)
+# Item box: the tilted glowing cube (assets/raw/items/itembox-tilted.png) replaces the flat box; the glow is cut away.
+import numpy as np
+raw = np.array(Image.open(RAW / 'items' / 'itembox-tilted.png').convert('RGBA'))
+raw[raw[..., 3] < 170] = 0
+cube = Image.fromarray(raw)
+mask = raw[..., 3] > 0
+rows = [r for r in bands(mask, 1) if r[1] - r[0] > 60]
+y0, y1 = rows[0][0], rows[-1][1]
+cubes = [cube.crop((x0, y0, x1, y1)) for (x0, x1) in bands(mask[y0:y1], 0) if x1 - x0 > 60]
+assert len(cubes) == 4, f'expected 4 item box frames, found {len(cubes)}'
+box = Image.new('RGBA', (128 * 4, 128), (0, 0, 0, 0))
+for i, c in enumerate(cubes): box.paste(fit(c, 128), (i * 128, 0))
+box.save(OUT / 'itembox.png')
 # Stadium decor (assets/raw/tiles/README.md): drum, tyres, pipe, elbow, tank, cone, hay, sign, floodlight, puddle, clump, grass, crowd x3.
 print('decor sprites:', split_sheet('decor', 'tiles', 128))
 
