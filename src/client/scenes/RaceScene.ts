@@ -309,16 +309,21 @@ export class RaceScene extends Phaser.Scene {
 
     // Moguls: a row of raised dirt humps with a hard shadow and a sunlit top, like the concept's hay-bale mounds.
     for (const e of ellipses('mogul')) {
-      for (let y = e.y - e.ry + 10; y <= e.y + e.ry - 10; y += 16) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.beginPath(); ctx.ellipse(e.x + 4, y + 5, 15, 9, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#3a2410';
-        ctx.beginPath(); ctx.ellipse(e.x, y, 15, 9, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#b07636';
-        ctx.beginPath(); ctx.ellipse(e.x, y - 1, 13, 7.5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#e0aa66';
-        ctx.beginPath(); ctx.ellipse(e.x - 3, y - 3, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-      }
+      // One long mound per row across the lane: hard shadow, dark front edge, sunlit rounded top and straw ridges.
+      const w = 26, h = e.ry * 2 - 10, x = e.x - w / 2, y = e.y - h / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.roundRect(x + 4, y + 7, w, h, 12); ctx.fill();
+      ctx.fillStyle = '#3a2410';
+      ctx.beginPath(); ctx.roundRect(x - 1, y + 2, w + 2, h + 2, 13); ctx.fill();
+      const g = ctx.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, '#e6b468');
+      g.addColorStop(0.55, '#b07636');
+      g.addColorStop(1, '#7a4c22');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.roundRect(x, y, w, h - 2, 12); ctx.fill();
+      ctx.strokeStyle = 'rgba(90,55,20,0.6)';
+      ctx.lineWidth = 1.5;
+      for (let yy = y + 8; yy < y + h - 8; yy += 7) { ctx.beginPath(); ctx.moveTo(x + 4, yy); ctx.lineTo(x + w - 4, yy + 2); ctx.stroke(); }
     }
 
     for (const p of cells('ramp')) {
