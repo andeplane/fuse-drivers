@@ -90,9 +90,10 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   // Only the stretch of the polyline between the last and the next checkpoint counts, so where the line
   // crosses itself (a bridge) the bot never follows the other level's branch through an under or deck wall.
   const cps = track.checkpoints, n = cps.length;
-  const crossing = (c: number) => wp.findIndex((a, i) => crosses(a, wp[(i + 1) % wp.length], cps[(c + n) % n]));
-  const from = crossing(t.checkpoint - 1), to = crossing(t.checkpoint);
-  const { i: segment, along } = from < 0 || to < 0 ? closestSegment(wp, t, 0, wp.length) : closestSegment(wp, t, from, ((to - from + wp.length) % wp.length) + 1);
+  // Nearest waypoint to a checkpoint's midpoint; a line through a vertex never strictly crosses a segment.
+  const vertexOf = (c: number) => { const m = cps[(c + n) % n].mid; let best = 0; wp.forEach((p, i) => { if (Math.hypot(p.x - m.x, p.y - m.y) < Math.hypot(wp[best].x - m.x, wp[best].y - m.y)) best = i; }); return best; };
+  const from = vertexOf(t.checkpoint - 1), to = vertexOf(t.checkpoint);
+  const { i: segment, along } = closestSegment(wp, t, (from - 1 + wp.length) % wp.length, ((to - from + wp.length) % wp.length) + 2);
   // Shorten the lookahead until the target is visible, so a hairpin never aims through its inside wall.
   // The sight line is tested at both flanks of the truck too, so a target just past a wall tip is not "visible".
   const flank = 0.8 * config.truck.radius;
