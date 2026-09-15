@@ -98,14 +98,33 @@ function build(def: TrackDef) {
 
   let id = 1;
   const poly = (name: string, pts: P[], key: 'polyline' | 'polygon') => ({ id: id++, name, x: 0, y: 0, [key]: pts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })), visible: true, rotation: 0 });
-  const walls = [poly('outer', offset(center, HALF_WIDTH), 'polygon'), poly('inner', offset(center, -HALF_WIDTH), 'polygon')];
 
-  const perp = (i: number, half: number): P[] => {
+  const outer = offset(center, HALF_WIDTH), inner = offset(center, -HALF_WIDTH);
+  /** Distance along the ray p + s*dir to the nearest wall hit, so checkpoints span exactly the lane (plus a hair). */
+  const rayToWalls = (p: P, dir: P): number => {
+    let best = Infinity;
+    for (const ring of [outer, inner]) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i], b = ring[(i + 1) % ring.length];
+        const ex = b.x - a.x, ey = b.y - a.y;
+        const den = dir.x * ey - dir.y * ex;
+        if (Math.abs(den) < 1e-9) continue;
+        const s = ((a.x - p.x) * ey - (a.y - p.y) * ex) / den;
+        const u = ((a.x - p.x) * dir.y - (a.y - p.y) * dir.x) / den;
+        if (s > 0 && u >= 0 && u <= 1) best = Math.min(best, s);
+      }
+    }
+    return Number.isFinite(best) ? best + 3 : HALF_WIDTH + 10;
+  };
+  const perp = (i: number): P[] => {
     const p = center[i], a = center[(i - 1 + center.length) % center.length], b = center[(i + 1) % center.length];
     const tx = b.x - a.x, ty = b.y - a.y, len = Math.hypot(tx, ty) || 1;
-    return [{ x: p.x - (ty / len) * half, y: p.y + (tx / len) * half }, { x: p.x + (ty / len) * half, y: p.y - (tx / len) * half }];
+    const n = { x: -ty / len, y: tx / len };
+    const s1 = rayToWalls(p, n), s2 = rayToWalls(p, { x: -n.x, y: -n.y });
+    return [{ x: p.x + n.x * s1, y: p.y + n.y * s1 }, { x: p.x - n.x * s2, y: p.y - n.y * s2 }];
   };
-  const checkpoints = [...def.corners.map((ci, k) => poly(`cp${k + 1}`, perp(ci * 12, HALF_WIDTH + 10), 'polyline')), poly('finish', perp(0, HALF_WIDTH + 10), 'polyline')];
+  const walls = [poly('outer', outer, 'polygon'), poly('inner', inner, 'polygon')];
+  const checkpoints = [...def.corners.map((ci, k) => poly(`cp${k + 1}`, perp(ci * 12), 'polyline')), poly('finish', perp(0), 'polyline')];
 
   const start = def.control[0];
   const heading = Math.atan2(center[1].y - start.y, center[1].x - start.x);
