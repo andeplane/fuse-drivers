@@ -45,7 +45,8 @@ for (let r = 0; r < races; r++) {
     }
     for (const t of state.trucks) {
       for (const [k, v] of Object.entries(t)) if (typeof v === 'number' && !Number.isFinite(v)) fail(`truck ${t.slot}.${k} is ${v}`);
-      if (!t.respawnAtTick && t.respawnedTick !== state.tick) {
+      // Walls resolve with last tick's bridge level (race.ts), so the tick a truck changes level is not a penetration.
+      if (!t.respawnAtTick && t.respawnedTick !== state.tick && t.onBridge === runner.previous.trucks[t.slot].onBridge) {
         const nearest = Math.min(t.x, t.y, maxX - t.x, maxY - t.y, ...track.walls.filter((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge)).map((w) => { const c = closestOnSegment(t, w); return Math.hypot(t.x - c.x, t.y - c.y); }));
         const pen = config.truck.radius - nearest;
         maxPenetration = Math.max(maxPenetration, pen);
@@ -59,7 +60,7 @@ for (let r = 0; r < races; r++) {
       lastCheckpoint[t.slot] = t.checkpoint;
       if (t.armor < 1 && !t.respawnAtTick) fail(`truck ${t.slot} armor ${t.armor} while alive`);
       if (t.progress > lastProgress[t.slot] + 1e-9) { lastProgress[t.slot] = t.progress; stuckSince[t.slot] = state.tick; }
-      else if (!t.finishedTick && state.tick - stuckSince[t.slot] > 300) { fail(`truck ${t.slot} stuck at progress ${t.progress.toFixed(2)}`); stuckSince[t.slot] = state.tick; }
+      else if (!t.finishedTick && state.tick - stuckSince[t.slot] > 300) { fail(`truck ${t.slot} (${bots[t.slot]}) stuck at progress ${t.progress.toFixed(2)} at ${t.x.toFixed(0)},${t.y.toFixed(0)} heading ${Math.round((t.heading * 180) / Math.PI)} speed ${t.speed.toFixed(0)} wallTicks ${t.wallTicks} bridge=${t.onBridge}`); stuckSince[t.slot] = state.tick; }
     }
     if (state.tick > 1 && state.placements.length !== n) fail('placements length');
     if (state.missiles.length > n || state.mines.length > 50) fail(`projectile growth: ${state.missiles.length} missiles ${state.mines.length} mines`);
