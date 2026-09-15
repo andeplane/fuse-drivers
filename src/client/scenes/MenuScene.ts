@@ -22,7 +22,8 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(width / 2, height * 0.62, 'ARROWS / A D steer  ·  S brake  ·  SHIFT nitro  ·  SPACE item  ·  hold DOWN + SPACE to fire backwards', { ...FONT, fontSize: '22px' }).setOrigin(0.5);
     const single = () => this.scene.start('Race', { series: createSeries([names[pick]], 5, Date.now() >>> 0, 1), tracks: data.tracks });
     const series = () => this.scene.start('Race', { series: createSeries(names, 5, Date.now() >>> 0, 5), tracks: data.tracks });
-    this.input.keyboard!.once('keydown-SPACE', single);
-    this.input.keyboard!.once('keydown-ENTER', series);
+    // Ignore auto-repeat so a key still held from the previous scene does not skip this one.
+    this.input.keyboard!.on('keydown-SPACE', (e: KeyboardEvent) => { if (!e.repeat) single(); });
+    this.input.keyboard!.on('keydown-ENTER', (e: KeyboardEvent) => { if (!e.repeat) series(); });
   }
 }

@@ -29,7 +29,7 @@ export class ResultsScene extends Phaser.Scene {
     }
     this.add.text(width / 2, height - 80, last ? 'SPACE OR CLICK FOR THE MENU' : 'SPACE OR CLICK FOR THE SHOP', { ...FONT, fontSize: '30px' }).setOrigin(0.5);
     const back = () => (last ? this.scene.start('Menu', { tracks: data.tracks }) : this.scene.start('Shop', { series: data.series, tracks: data.tracks }));
-    this.input.keyboard!.once('keydown-SPACE', back);
+    this.input.keyboard!.on('keydown-SPACE', (e: KeyboardEvent) => { if (!e.repeat) back(); });
     this.input.once('pointerdown', back);
   }
 }

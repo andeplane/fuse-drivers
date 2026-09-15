@@ -40,9 +40,9 @@ export class ShopScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     kb.on('keydown-UP', () => { cursor = (cursor + KINDS.length - 1) % KINDS.length; redraw(); });
     kb.on('keydown-DOWN', () => { cursor = (cursor + 1) % KINDS.length; redraw(); });
-    kb.on('keydown-SPACE', () => { const d = buy(series.drivers[0], KINDS[cursor]); if (d) { series = { ...series, drivers: series.drivers.map((x) => (x.slot === 0 ? d : x)) }; redraw(); } });
+    kb.on('keydown-SPACE', (e: KeyboardEvent) => { if (e.repeat) return; const d = buy(series.drivers[0], KINDS[cursor]); if (d) { series = { ...series, drivers: series.drivers.map((x) => (x.slot === 0 ? d : x)) }; redraw(); } });
     const go = () => this.scene.start('Race', { series, tracks: data.tracks });
-    kb.once('keydown-ENTER', go);
+    kb.on('keydown-ENTER', (e: KeyboardEvent) => { if (!e.repeat) go(); });
     this.input.once('pointerdown', go);
   }
 }
