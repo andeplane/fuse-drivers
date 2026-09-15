@@ -41,19 +41,6 @@ for i, s in enumerate(SURFACES): strip.paste(tiles[s], (i * TILE, 0))
 strip.save(OUT / 'surfaces.png')
 strip.resize((32 * len(SURFACES), 32), Image.LANCZOS).save(Path('tracks') / 'surfaces.png')  # lets Tiled show the surface layer
 
-# Trucks: rotate the full-resolution source, then Lanczos to 256 px cells. Frame 0 = up, clockwise.
-for color in ['cyan', 'pink', 'lime', 'orange', 'violet']:
-    src = Image.open(RAW / 'trucks' / f'truck-{color}-single.png').convert('RGBA')
-    src = src.crop(src.getbbox())
-    side = int(max(src.size) * 1.05)
-    sq = Image.new('RGBA', (side, side), (0, 0, 0, 0)); sq.alpha_composite(src, ((side - src.width) // 2, (side - src.height) // 2))
-    sheet = Image.new('RGBA', (4 * TRUCK_CELL, 4 * TRUCK_CELL), (0, 0, 0, 0))
-    for i in range(16):
-        frame = sq.rotate(-22.5 * i, resample=Image.BICUBIC, expand=False).resize((TRUCK_CELL, TRUCK_CELL), Image.LANCZOS)
-        sheet.alpha_composite(frame, ((i % 4) * TRUCK_CELL, (i // 4) * TRUCK_CELL))
-    sheet.save(OUT / f'truck-{color}.png')
-
-
 def bands(mask, axis):
     """Runs of non-empty rows (axis=1) or columns (axis=0) in a boolean alpha mask; returns [(start, end)]."""
     proj = mask.any(axis=axis)
@@ -63,6 +50,57 @@ def bands(mask, axis):
         if not v and start is not None: out.append((start, i)); start = None
     if start is not None: out.append((start, len(proj)))
     return out
+
+def tilted_frames():
+    """Truck frames drawn from the arcade's elevated camera (assets/raw/trucks-tilted/README.md), in sheet order
+    frame 0 = driving up the screen, clockwise in 22.5 degree steps. The 8 main headings come from cyan-8dir-try1
+    (real alpha, a soft glow that is cut away), the in-between headings from cyan-8dir-between (flat magenta key)."""
+    import numpy as np
+    def clean(im, key_magenta):
+        a = np.array(im.convert('RGBA'))
+        if key_magenta:
+            r, g, b = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int)
+            a[((r > 180) & (b > 180) & (g < 110)) | ((r > 140) & (b > 140) & (g < (r + b) // 2 - 50))] = 0  # key plus pink fringe
+        r, g, b = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int)
+        a[(r > g + 40) & (b > g + 40) & (abs(r - b) < 90) & (g < 120)] = 0  # purple fringe left by the magenta key
+        a[a[..., 3] < 160] = 0
+        return Image.fromarray(a)
+    def sprites(name, key_magenta):
+        im = clean(Image.open(RAW / 'trucks-tilted' / f'{name}.png'), key_magenta)
+        a = np.array(im)[:, :, 3] > 0
+        out = []
+        for (y0, y1) in bands(a, 1):
+            if y1 - y0 < 80: continue
+            row = [(x0, x1) for (x0, x1) in bands(a[y0:y1], 0) if x1 - x0 >= 80]
+            out += [im.crop((x0, y0, x1, y1)) for (x0, x1) in row]
+        return [s.crop(s.getbbox()) for s in out]
+    main = sprites('cyan-8dir-try1', False)
+    between = sprites('cyan-8dir-between', True)
+    assert len(main) == 8 and len(between) == 8, f'expected 8 + 8 trucks, found {len(main)} + {len(between)}'
+    flip = lambda s: s.transpose(Image.FLIP_LEFT_RIGHT)
+    # Right-hand half (up, clockwise to straight down) from the cells whose heading came out right; the between
+    # sheet's third cell faces down-left, so it is mirrored. The left half mirrors the right, so turning is symmetric.
+    right = [main[0], between[0], main[1], between[1], main[2], flip(between[2]), main[3], between[3], main[4]]
+    return right + [flip(right[16 - i]) for i in range(9, 16)]
+
+# Trucks: every frame shares one scale and sits on one baseline, so the truck neither grows nor hops when it turns.
+frames = tilted_frames()
+scale = TRUCK_CELL * 0.92 / max(max(f.size) for f in frames)
+cyan = Image.new('RGBA', (4 * TRUCK_CELL, 4 * TRUCK_CELL), (0, 0, 0, 0))
+for i, f in enumerate(frames):
+    f = f.resize((max(1, round(f.width * scale)), max(1, round(f.height * scale))), Image.LANCZOS)
+    x = (i % 4) * TRUCK_CELL + (TRUCK_CELL - f.width) // 2
+    cyan.alpha_composite(f, (x, (i // 4) * TRUCK_CELL + (TRUCK_CELL - f.height) // 2))
+cyan.save(OUT / 'truck-cyan.png')
+import importlib.util
+spec = importlib.util.spec_from_file_location('recolor', RAW / 'trucks' / 'recolor.py'); recolor = importlib.util.module_from_spec(spec); spec.loader.exec_module(recolor)
+for name, hexcolor in recolor.TARGETS.items(): recolor.recolor(OUT / 'truck-cyan.png', OUT / f'truck-{name}.png', hexcolor)
+
+# Stadium (assets/raw/stadium/README.md): crowd rows to tile the stands, and the fence with blank banner boards.
+strip = Image.open(RAW / 'stadium' / 'grandstand-strip.png').convert('RGBA')
+strip.crop((0, 0, strip.width, 580)).resize((strip.width // 2, 290), Image.LANCZOS).save(OUT / 'grandstand.png')
+strip.crop((0, 580, strip.width, 790)).resize((strip.width // 2, 105), Image.LANCZOS).save(OUT / 'fence.png')
+
 
 def crops(name, group, min_size=12):
     """Sprites of a raw sheet found by transparent gaps, row by row, at source resolution."""
