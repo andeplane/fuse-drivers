@@ -38,7 +38,7 @@ Mirror and reverse variants triple the count at build time.
 
 ## Art
 
-Neon-pixel hybrid from the mockup: dark industrial ground, green toxic pools, red warning lights, cyan/pink/lime/violet/orange trucks with matching nitro glow, chunky pixel HUD. Strict overhead camera; sprites must read from a couch. Pipeline: concept screenshot per track with the image tool first, then a 32 px tileset, five palette-swapped truck sprites, item icons, particle sheets, Press Start 2P for the HUD. Free sprite rotation first; 16 snapped directions only if it looks bad.
+Neon-pixel hybrid from the mockup: dark industrial ground, green toxic pools, red warning lights, cyan/pink/lime/violet/orange trucks with matching nitro glow, chunky pixel HUD. Strict overhead camera; sprites must read from a couch. Pipeline: concept screenshot per track with the image tool first, then a 32 px tileset, five palette-swapped truck sprites, item icons, particle sheets, Press Start 2P for the HUD. Truck sprites pre-rendered in 16 directions, snapped by the renderer.
 
 ## Milestones
 
@@ -59,9 +59,6 @@ Each is playable before the next starts.
 - Tiled for tracks, no in-game editor.
 - Throttle always on, two turn buttons, drift from held turns.
 - Only weapons kill; hazards chip. Kills are bragging rights and $100.
+- Live progress ranking during the race (ADR 003).
+- Truck sprites pre-rendered in 16 directions (ADR 001).
 - Repo starts empty; port files from Fuse Riders one at a time as needed.
-
-## Open questions
-
-- Ranking during the race by live progress (current ADR 003) or Super Off Road style by laps only with position shown at the line?
-- Truck rotation: free or 16 snapped directions? Decide after seeing the first sprite in motion.
