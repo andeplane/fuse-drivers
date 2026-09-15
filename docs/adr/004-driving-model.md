@@ -21,10 +21,10 @@ Super Off Road used eight-way absolute steering on a joystick. A phone thumb, an
 | Hitbox | circle r = 14 |
 
 - **Multiplier rules.** Surface, nitro, boost pad, drift and drift-boost multiply the tick's displacement, never the speed scalar, so mud bites instantly and ends instantly. Wall, landing and spin-out scale the speed scalar, so the truck accelerates back. Of nitro (1.5), boost pad (1.5) and drift boost (1.25) only the largest applies. Drift (0.92) and surface multiply on top, except nitro ignores surface.
-- **Walls**: movement is projected onto the wall tangent. First contact (after at least one free tick): speed × 0.7. Each further contact tick: speed × 0.97. No bounce.
+- **Walls**: the truck is pushed back to the side of each wall it started the tick on, so no speed can tunnel through. First contact (after at least one free tick): speed × 0.7. Each further contact tick: speed × 0.97. No bounce.
 - **Trucks**: push apart along the center line, headings unchanged, weighted by mass = 1 + 0.15 × armor upgrade level.
 - **Drift**: holding one turn for more than 4 ticks above 70 % of top speed enters drift: turn rate × 1.4, displacement × 0.92. While drifting, the opposite button halves turn rate instead of ending the drift; drift ends when both turn buttons are released. Release after at least 8 drift ticks grants 0.6 s at × 1.25.
-- **Nitro**: 3 per race base, max 6. 1.2 s at × 1.5 ignoring surface. Blocked while airborne or spun out. **Rocket start**: `nitro` pressed in the last 10 ticks of the countdown grants a free 0.6 s at × 1.25 and consumes no nitro.
+- **Nitro**: 3 per race base, max 6. 1.2 s at × 1.5 ignoring surface. Blocked while airborne or spun out. **Rocket start**: a `nitro` press (rising edge) within the last 10 ticks of the countdown grants a free 0.6 s at × 1.25 and consumes no nitro.
 - **Jumps**: ramp tiles set airborne for `12 + 10 × speedFraction` ticks: no steering, no surface effects, no item use. Landing scales speed × 0.85 (shocks upgrades raise this toward × 1.0). Landing within 28 u of another truck spins that truck out (M2).
 - **Surfaces** (tile-based, ADR 003):
 

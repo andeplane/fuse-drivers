@@ -54,17 +54,24 @@ export function crosses(p0: Point, p1: Point, s: Segment): boolean {
   return d1 * d2 < 0 && d3 * d4 < 0;
 }
 
-function resolveWalls(t: Truck, track: Track, wasTouching: boolean): [Truck, boolean] {
+/** Keeps the truck on the side of each wall it started the tick on, so speed can never tunnel through (ADR 004). */
+function resolveWalls(t: Truck, from: Point, track: Track, wasTouching: boolean): [Truck, boolean] {
   const r = config.truck.radius;
   let x = t.x, y = t.y, touched = false;
   for (let pass = 0; pass < 2; pass++) {
     for (const w of track.walls) {
+      const ex = w.b.x - w.a.x, ey = w.b.y - w.a.y;
+      const startSide = Math.sign(ex * (from.y - w.a.y) - ey * (from.x - w.a.x)) || 1;
       const c = closestOnSegment({ x, y }, w);
       const dx = x - c.x, dy = y - c.y;
       const d = Math.hypot(dx, dy);
-      if (d >= r) continue;
+      const tunneled = crosses(from, { x, y }, w);
+      if (d >= r && !tunneled) continue;
       touched = true;
-      if (d < 1e-9) { x += r; continue; }
+      const nowSide = Math.sign(ex * (y - w.a.y) - ey * (x - w.a.x)) || startSide;
+      const len = Math.hypot(ex, ey) || 1;
+      const nx = (-ey / len) * startSide, ny = (ex / len) * startSide;
+      if (tunneled || nowSide !== startSide || d < 1e-9) { x = c.x + nx * r; y = c.y + ny * r; continue; }
       x += (dx / d) * (r - d);
       y += (dy / d) * (r - d);
     }
@@ -87,7 +94,7 @@ function resolveContacts(trucks: Truck[]): Truck[] {
   for (let i = 0; i < out.length; i++) {
     for (let j = i + 1; j < out.length; j++) {
       const a = out[i], b = out[j];
-      if (a.respawnAtTick || b.respawnAtTick) continue;
+      if (a.respawnAtTick || b.respawnAtTick || a.finishedTick || b.finishedTick) continue;
       const dx = b.x - a.x, dy = b.y - a.y;
       const d = Math.hypot(dx, dy);
       if (d >= r2) continue;
@@ -112,6 +119,7 @@ function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[])
     events.push({ tick, type: 'land', slot: n.slot });
   }
   if (airborne) return n;
+  if (kind !== 'toxic' && n.toxicNextTick) n = { ...n, toxicNextTick: 0 };
   switch (kind) {
     case 'oil': return { ...n, oilUntilTick: tick + c.oilTicks };
     case 'boost': return { ...n, padUntilTick: tick + c.boostPadTicks };
@@ -125,8 +133,22 @@ function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[])
       if (tick < n.toxicNextTick) return n;
       return { ...n, armor: Math.max(1, n.armor - 1), toxicNextTick: tick + c.toxicIntervalTicks };
     }
-    default: return n.toxicNextTick === 0 ? n : { ...n, toxicNextTick: 0 };
+    default: return n;
   }
+}
+
+/** Unit tangent of the nearest waypoint segment: the direction the track is meant to be driven here. */
+export function trackDirectionAt(track: Track, p: Point): Point {
+  const wp = track.waypoints;
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < wp.length; i++) {
+    const c = closestOnSegment(p, { a: wp[i], b: wp[(i + 1) % wp.length] });
+    const d = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  const a = wp[best], b = wp[(best + 1) % wp.length];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
 }
 
 export function progressOf(t: Truck, track: Track): number {
@@ -154,8 +176,8 @@ function applyCheckpoints(prev: Truck, t: Truck, track: Track, tick: number, eve
       }
     }
   }
-  const next = track.checkpoints[n2.checkpoint];
-  const facing = dot(Math.cos(n2.heading), Math.sin(n2.heading), next.mid.x - n2.x, next.mid.y - n2.y);
+  const along = trackDirectionAt(track, n2);
+  const facing = dot(Math.cos(n2.heading), Math.sin(n2.heading), along.x, along.y);
   const wrongWayTicks = facing < 0 && !n2.finishedTick ? n2.wrongWayTicks + 1 : 0;
   if (wrongWayTicks === config.truck.wrongWayTicks) events.push({ tick, type: 'wrongWay', slot: n2.slot });
   return { ...n2, wrongWayTicks, progress: progressOf(n2, track) };
@@ -189,7 +211,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   if (state.phase === 'countdown') {
     const trucks = state.trucks.map((t, i) => {
       const input = inputs[i] ?? NEUTRAL_INPUT;
-      const armed = input.nitro && tick >= state.countdownEndTick - c.rocketStartWindow;
+      const armed = input.nitro && !t.prevNitro && tick > state.countdownEndTick - c.rocketStartWindow;
       return { ...t, prevNitro: input.nitro, boostUntilTick: armed ? state.countdownEndTick + c.boostTicks : t.boostUntilTick };
     });
     if (tick >= state.countdownEndTick) events.push({ tick, type: 'start' });
@@ -198,27 +220,30 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
 
   const prev = state.trucks;
   let trucks = prev.map((t, i) => {
+    if (t.finishedTick) return t.speed === 0 ? t : { ...t, speed: 0 };
     if (t.respawnAtTick) {
       if (tick < t.respawnAtTick) return t;
       const pose = respawnPose(t, track);
       return { ...t, ...pose, speed: 0, respawnAtTick: 0, respawnedTick: tick, armor: t.stats.maxArmor, invulnerableUntilTick: tick + c.invulnerableTicks, item: null, shieldUntilTick: 0, spinUntilTick: 0, airborneUntilTick: 0, landAtTick: 0, oilUntilTick: 0, nitroUntilTick: 0, boostUntilTick: 0, padUntilTick: 0, driftDir: 0 as const, driftTicks: 0 };
     }
-    const input = t.finishedTick ? NEUTRAL_INPUT : inputs[i] ?? NEUTRAL_INPUT;
+    const input = inputs[i] ?? NEUTRAL_INPUT;
     const surface = surfaceAt(track, t.x, t.y);
     const [moved, r] = stepTruck(t, input, surface, tick, rng);
     rng = r;
     return moved;
   });
 
+  const parked = (t: Truck) => t.respawnAtTick !== 0 || t.finishedTick !== 0;
   trucks = trucks.map((t, i) => {
-    if (t.respawnAtTick) return t;
-    const [resolved, touching] = resolveWalls(t, track, prev[i].wallTicks > 0);
+    if (parked(t)) return t;
+    const [resolved, touching] = resolveWalls(t, prev[i], track, prev[i].wallTicks > 0);
     if (touching && prev[i].wallTicks === 0) events.push({ tick, type: 'wall', slot: t.slot });
     return { ...resolved, wallTicks: touching ? prev[i].wallTicks + 1 : 0 };
   });
   trucks = resolveContacts(trucks);
-  trucks = trucks.map((t) => (t.respawnAtTick ? t : applySurface(t, track, tick, events)));
-  trucks = trucks.map((t, i) => (t.respawnAtTick ? t : applyCheckpoints(prev[i], t, track, tick, events)));
+  trucks = trucks.map((t) => (parked(t) ? t : applySurface(t, track, tick, events)));
+  // A respawn teleport is not a crossing: compare the truck with itself so the chord has zero length.
+  trucks = trucks.map((t, i) => (parked(t) ? t : applyCheckpoints(t.respawnedTick === tick ? t : prev[i], t, track, tick, events)));
 
   const placements = rank(trucks);
   let raceEndTick = state.raceEndTick;

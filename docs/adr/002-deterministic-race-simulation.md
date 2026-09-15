@@ -20,7 +20,7 @@ Bots, replay tests, results that every viewer agrees on and a future authoritati
   6. Item box pickups, rolled in slot order.
   7. Checkpoints, laps, finish, race end timer.
   8. Placements by progress descending, then lower slot.
-- **Events** (`hit`, `kill`, `pickup`, `lap`, `finish`, `wrongWay`) carry their `tick` and are returned from `step`, not stored on the snapshot. The runner concatenates events from every step it performs; the M3 server sends events since the last delivered snapshot. Anything with a duration (lock-on, shield, spin-out, invulnerability, drone) is an `untilTick` field on the truck, never an event.
+- **Events** (`hit`, `kill`, `pickup`, `lap`, `finish`, `wrongWay`, `wall`, `land`, `start`) carry their `tick` and are returned from `step`, not stored on the snapshot. The runner concatenates events from every step it performs; the M3 server sends events since the last delivered snapshot. Anything with a duration (lock-on, shield, spin-out, invulnerability, drone) is an `untilTick` field on the truck, never an event.
 - Snapshots are plain JSON: no classes, Maps or functions, all numbers finite and never `-0`. The replay hash uses canonical JSON (sorted keys).
 - All balance values live in `src/shared/config.ts`; docs link to it and do not copy tables once it exists.
 
