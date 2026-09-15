@@ -46,9 +46,9 @@ Chosen style: **arcade 1989**, `docs/concepts/style-02-arcade-1989.png`. Authent
 
 Each is playable before the next starts.
 
-1. **M0 Kernel + track.** Truck kernel and surfaces, `parseTrack`, Refinery Oval in Tiled rendered by Phaser, checkpoints and laps, wrong-way label, keyboard, runner with interpolation, replay test.
-2. **M1 Single-player race.** Bots, countdown with rocket start, 4 laps, HUD, results. Items: mine, missile, shield, nitro refill. Armor, spin-out, death, respawn, kills. The first version worth showing anyone.
-3. **M2 Series + shop + items.** Money, upgrades, series winner. Oil slick, drone, EMP, forward mine lob, landing spin-out. Sidewinder and Sump, bridges, mirror and reverse variants.
+1. **M0 Kernel + track.** Done 2026-09-15. Truck kernel and surfaces, `parseTrack`, Refinery in Tiled rendered by Phaser, checkpoints and laps, wrong-way label, keyboard, runner with interpolation, replay test, headless simulator.
+2. **M1 Single-player race.** Done 2026-09-15. Bots, countdown with rocket start, 4 laps, HUD, results. Items: mine, missile, shield, nitro refill. Armor, spin-out, death, respawn, kills.
+3. **M2 Series + shop + items.** Done 2026-09-15 except landing-on-truck spin-out. Money, upgrades, series standings. Oil slick, drone, EMP, forward lob. Sidewinder with a bridge, Sump, mirror and reverse variants of every track.
 4. **M3 Party on a TV.** Room, QR code, phones as controllers, the runner moves into a Node server. Bots fill empty seats.
 5. **M4 Online.** Same server hosted, room codes, reconnect tokens, individual-device play.
 6. **M5 Polish.** Art pass, sound, touch controls for solo phone play, tuning, attract screen.
