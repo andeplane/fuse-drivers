@@ -23,7 +23,7 @@ export interface TruckStats {
 export const BASE_STATS: TruckStats = {
   topSpeed: 320,
   accelTime: 1.2,
-  turnRateHigh: deg(180),
+  turnRateHigh: deg(240),
   landingMul: 0.85,
   maxArmor: 4,
   nitros: 3,

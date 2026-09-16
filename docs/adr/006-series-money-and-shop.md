@@ -16,7 +16,7 @@ The between-race shop is what people remember from Super Off Road. It is also th
 | --- | --- | --- |
 | Top speed | 5 | +16 u/s |
 | Acceleration | 5 | −0.08 s to top speed |
-| Tires | 5 | +18°/s turn rate at top speed |
+| Tires | 5 | +6°/s turn rate at top speed, five levels reaching the at-rest rate |
 | Shocks | 5 | landing speed multiplier +0.03 |
 | Armor | 3 | +1 max armor (cap 7) and +0.15 mass |
 | Nitro | 3 | +1 nitro per race (cap 6) |

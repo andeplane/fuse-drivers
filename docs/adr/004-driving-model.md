@@ -16,7 +16,7 @@ Super Off Road used eight-way absolute steering on a joystick. A phone thumb, an
 | --- | --- |
 | Top speed | 320 u/s |
 | Time to top speed | 1.2 s |
-| Turn rate | 270°/s at rest, blending linearly to 180°/s at top speed |
+| Turn rate | 270°/s at rest, blending linearly to 240°/s at top speed |
 | Brake | 600 u/s², reverse cap 120 u/s |
 | Hitbox | circle r = 14 |
 

@@ -40,7 +40,8 @@ export function statsFor(levels: Record<UpgradeKind, number>): TruckStats {
   return {
     topSpeed: BASE_STATS.topSpeed + 16 * levels.topSpeed,
     accelTime: BASE_STATS.accelTime - 0.08 * levels.accel,
-    turnRateHigh: BASE_STATS.turnRateHigh + deg(18) * levels.tires,
+    // Five levels close the whole gap to the at-rest rate: the best tyres keep your full turn at top speed.
+    turnRateHigh: BASE_STATS.turnRateHigh + deg(6) * levels.tires,
     landingMul: BASE_STATS.landingMul + 0.03 * levels.shocks,
     maxArmor: BASE_STATS.maxArmor + levels.armor,
     nitros: Math.min(config.truck.nitroMax, BASE_STATS.nitros + levels.nitro),
