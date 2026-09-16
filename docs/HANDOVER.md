@@ -1,3 +1,22 @@
+# Handover — 2026-09-16 (deployment)
+
+The game is published at **https://andeplane.github.io/fuse-drivers/** from the public repo
+`andeplane/fuse-drivers`. `.github/workflows/pages.yml` typechecks, tests and publishes on every push
+to `main`, building with the repository name as the base path. Solo play and the series need no server.
+
+Party mode needs the Node server. `src/party-origin.ts` gives the TV page and the phone pad their socket
+origin: same origin when self-hosted, `VITE_PARTY_ORIGIN` when the pages are static. The server accepts
+sockets from origins in `ALLOWED_ORIGINS` and answers `/api/health` (Cloud Run intercepts some paths
+ending in `z`). `scripts/deploy-server.sh` deploys it to Cloud Run in one command; it pins the service to
+**one instance** because rooms live in memory. The backend is not deployed yet: it costs money and the
+local `gcloud` points at a work project, so the user must choose the project and run the script.
+
+Verification note: after a cross-origin navigate the Browser pane can screenshot a stale, corner-cropped
+canvas. Read `canvas.getBoundingClientRect()` and, in dev builds, `window.game.scale` before believing a
+screenshot; the same scale numbers render correctly on localhost.
+
+---
+
 # Handover — 2026-09-15 (second session)
 
 Read this, then `AGENTS.md`, `PLAN.md`, `docs/adr/`.
