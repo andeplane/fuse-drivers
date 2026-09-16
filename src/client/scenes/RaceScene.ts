@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BOT_LEVELS, config, TICK_MS } from '../../shared/config.ts';
+import { BASE_STATS, BOT_LEVELS, config, TICK_MS, type TruckStats } from '../../shared/config.ts';
 import { applyRace, statsFor, type Series } from '../../shared/series.ts';
 import { trackDirectionAt, type RaceEvent, type RaceState } from '../../shared/race.ts';
 import { dronePosition } from '../../shared/items.ts';
@@ -13,9 +13,21 @@ import { renderSnapshot } from '../render/interpolate.ts';
 import { FRAMES, SPRITE_CELL, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
 
 /** World units per sprite cell: a 44 u long top-down truck around its 28 u collision circle. */
-const TRUCK_SCALE = 44 / (TRUCK_CELL * 0.92);
+/**
+ * Playtest knobs for solo races, read from the page URL so feel can be compared without a code change:
+ * `?top=320&accel=0.8&truck=60` sets base top speed (u/s), base time to top speed (s) and drawn truck length (u).
+ * Upgrades still add on top. Party races ignore them (the server owns the stats).
+ */
+const TUNE = new URLSearchParams(location.search);
+const tune = (name: string) => { const v = Number(TUNE.get(name)); return Number.isFinite(v) && v > 0 ? v : undefined; };
+const TRUCK_SCALE = (tune('truck') ?? 44) / (TRUCK_CELL * 0.92);
 /** The arcade camera looks down at an angle: a rotated truck is squashed vertically after rotation... */
 const TILT = 0.72;
+const tuned = (s: TruckStats): TruckStats => ({
+  ...s,
+  topSpeed: s.topSpeed + (tune('top') ?? BASE_STATS.topSpeed) - BASE_STATS.topSpeed,
+  accelTime: Math.max(0.1, s.accelTime + (tune('accel') ?? BASE_STATS.accelTime) - BASE_STATS.accelTime),
+});
 /** ...and stacked on darker copies of itself, one per layer, so its sides show below the roof. */
 const SIDE_LAYERS = 5;
 /** Two whole turns over a spin-out, so the whirl starts and ends on the truck's heading. */
@@ -110,7 +122,7 @@ export class RaceScene extends Phaser.Scene {
     // The attract demo gives slot 0 to a bot as well.
     const levels = this.attract ? (['normal', ...BOT_LEVELS] as const) : BOT_LEVELS;
     const bots = Object.fromEntries(levels.map((d, i) => [this.attract ? i : i + 1, d]));
-    this.runner = data.party?.runner ?? createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => statsFor(d.levels)), bots);
+    this.runner = data.party?.runner ?? createRaceRunner(this.track, (Date.now() + data.series.raceIndex) >>> 0, data.series.drivers.map((d) => tuned(statsFor(d.levels))), bots);
     const keyboard = createKeyboard(this);
     this.readInput = keyboard;
     if (this.attract) {

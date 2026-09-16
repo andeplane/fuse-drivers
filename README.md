@@ -15,6 +15,8 @@ Open the printed URL. **Space** starts a single race on the selected track (left
 
 Controls: arrows or **A / D** steer, **S** brake, **Shift** nitro, **Space** use item, hold **Down** with Space to use it the other way (mine lobbed ahead, missile fired backwards). Throttle is always on.
 
+Tuning feel: solo races read `?top=` (base top speed, u/s, default 200), `?accel=` (seconds to top speed, default 1.2) and `?truck=` (drawn truck length, u, default 44) from the page URL, e.g. `http://localhost:5173/?top=280&accel=0.8&truck=56`. Party races ignore them.
+
 Sound is synthesized in the browser (no audio files) and starts on the first key press; **M** toggles mute and is remembered.
 
 ### Party on a TV (phones as controllers)
