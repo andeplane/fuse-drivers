@@ -12,7 +12,7 @@ const load = (n: string) => parseTrack(JSON.parse(readFileSync(`tracks/${n}.tmj`
 const sidewinder = load('sidewinder');
 const bridge = sidewinder.bridges[0];
 const racing = (n: number): RaceState => ({ ...createRace(sidewinder, 1, Array(n).fill(BASE_STATS)), phase: 'racing', tick: 100 });
-const at = (t: Truck, x: number, y: number, heading: number, extra: Partial<Truck> = {}): Truck => ({ ...t, x, y, heading, speed: 300, ...extra });
+const at = (t: Truck, x: number, y: number, heading: number, extra: Partial<Truck> = {}): Truck => ({ ...t, x, y, heading, speed: BASE_STATS.topSpeed, ...extra });
 
 test('the parser accepts every committed track and variant', () => {
   const names = readdirSync('tracks').filter((f) => f.endsWith('.tmj')).map((f) => f.replace('.tmj', ''));
@@ -25,7 +25,7 @@ test('entering the deck from its entry side sets onBridge; the under lane does n
   let s = racing(1);
   const cx = (bridge.x0 + bridge.x1) / 2, cy = (bridge.y0 + bridge.y1) / 2;
   // From above, heading down: deck.
-  s = { ...s, trucks: [at(s.trucks[0], cx, bridge.y0 - 8, Math.PI / 2)] };
+  s = { ...s, trucks: [at(s.trucks[0], cx, bridge.y0 - 5, Math.PI / 2)] };
   let r = step(s, [NEUTRAL_INPUT], sidewinder);
   assert.equal(r.state.trucks[0].onBridge, true);
   // Keep driving down until it leaves the rectangle: cleared.
@@ -34,7 +34,7 @@ test('entering the deck from its entry side sets onBridge; the under lane does n
   assert.ok(r.state.trucks[0].y > bridge.y1);
   // From the right, heading left: under lane, flag stays off and the under walls still confine it.
   let u = racing(1);
-  u = { ...u, trucks: [at(u.trucks[0], bridge.x1 + 8, cy, Math.PI)] };
+  u = { ...u, trucks: [at(u.trucks[0], bridge.x1 + 5, cy, Math.PI)] };
   let ur = step(u, [NEUTRAL_INPUT], sidewinder);
   assert.equal(ur.state.trucks[0].onBridge, false);
   for (let i = 0; i < 30; i++) ur = step(ur.state, [NEUTRAL_INPUT], sidewinder);
@@ -44,7 +44,7 @@ test('entering the deck from its entry side sets onBridge; the under lane does n
 test('a deck truck is held by the railings and never drops onto the under lane sideways', () => {
   let s = racing(1);
   const cx = (bridge.x0 + bridge.x1) / 2;
-  s = { ...s, trucks: [at(s.trucks[0], cx, bridge.y0 - 8, Math.PI / 2)] };
+  s = { ...s, trucks: [at(s.trucks[0], cx, bridge.y0 - 5, Math.PI / 2)] };
   let r = step(s, [NEUTRAL_INPUT], sidewinder);
   assert.equal(r.state.trucks[0].onBridge, true);
   for (let i = 0; i < 12; i++) r = step(r.state, [{ ...NEUTRAL_INPUT, right: true }], sidewinder);

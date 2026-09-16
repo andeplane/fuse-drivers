@@ -14,10 +14,10 @@ Super Off Road used eight-way absolute steering on a joystick. A phone thumb, an
 
 | Parameter | Base |
 | --- | --- |
-| Top speed | 320 u/s |
+| Top speed | 200 u/s (was 320; the user found it too fast, amended 2026-09-16) |
 | Time to top speed | 1.2 s |
-| Turn rate | 270°/s at rest, blending linearly to 240°/s at top speed |
-| Brake | 600 u/s², reverse cap 120 u/s |
+| Turn rate | 270°/s at rest, blending linearly to 180°/s at top speed (tyres add 18°/s per level) |
+| Brake | 375 u/s², reverse cap 75 u/s |
 | Hitbox | circle r = 14 |
 
 - **Multiplier rules.** Surface, nitro, boost pad, drift and drift-boost multiply the tick's displacement, never the speed scalar, so mud bites instantly and ends instantly. Wall, landing and spin-out scale the speed scalar, so the truck accelerates back. Of nitro (1.5), boost pad (1.5) and drift boost (1.25) only the largest applies. Drift (0.92) and surface multiply on top, except nitro ignores surface.

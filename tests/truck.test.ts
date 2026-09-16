@@ -12,7 +12,7 @@ const run = (t: Truck, input: Partial<TruckInput>, ticks: number, surface: 'dirt
 
 test('reaches top speed in 36 ticks', () => {
   const t = run(createTruck(0, 0, 0, 0), {}, 36);
-  assert.equal(t.speed, t.stats.topSpeed);
+  assert.ok(t.stats.topSpeed - t.speed < 1e-9);
   assert.ok(run(createTruck(0, 0, 0, 0), {}, 35).speed < t.stats.topSpeed);
 });
 

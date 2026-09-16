@@ -21,9 +21,9 @@ export interface TruckStats {
 }
 
 export const BASE_STATS: TruckStats = {
-  topSpeed: 320,
+  topSpeed: 200,
   accelTime: 1.2,
-  turnRateHigh: deg(240),
+  turnRateHigh: deg(180),
   landingMul: 0.85,
   maxArmor: 4,
   nitros: 3,
@@ -41,13 +41,13 @@ export const config = {
   tile: 32,
   laps: 4,
   countdownTicks: 90,
-  /** 30 s after the leader finishes: at 12-17 s laps a 12 s grace left 37-52 % of the field DNF. */
-  raceEndGraceTicks: 900,
+  /** 45 s after the leader finishes: at 12-17 s laps a 12 s grace left 37-52 % of the field DNF, and laps are now ~60 % slower. */
+  raceEndGraceTicks: 1350,
   truck: {
     radius: 14,
     turnRateLow: deg(270),
-    brakeDecel: 600,
-    reverseCap: 120,
+    brakeDecel: 375,
+    reverseCap: 75,
     wallFirstHit: 0.7,
     wallSlideTick: 0.97,
     driftEnterTicks: 4,
@@ -92,7 +92,7 @@ export const config = {
   items: {
     boxCooldownTicks: 90,
     boxRadius: 18,
-    missile: { speed: 600, turnRate: deg(200), lifeTicks: 120, radius: 6, lockRange: 600, lockCone: deg(45), armTicks: 10 },
+    missile: { speed: 400, turnRate: deg(200), lifeTicks: 120, radius: 6, lockRange: 600, lockCone: deg(45), armTicks: 10 },
     mine: { dropBehind: 30, lobAhead: 200, armTicks: 15, lifeTicks: 600, radius: 20 },
     shieldTicks: 180,
     nitroRefill: 2,

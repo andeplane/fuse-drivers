@@ -36,7 +36,7 @@ test('shop rejects unaffordable and over-level purchases; max upgrades hit the d
   for (let i = 0; i < 3; i++) d = buy(d, 'armor')!;
   assert.equal(buy(d, 'armor'), null);
   const st = statsFor(d.levels);
-  assert.equal(st.topSpeed, 400);
+  assert.equal(st.topSpeed, 250);
   assert.equal(st.maxArmor, 7);
   assert.ok(Math.abs(st.mass - 1.45) < 1e-9);
 });
