@@ -21,6 +21,7 @@ const MAX_TICKS = 30 * 240;
 let failures = 0, totalTicks = 0;
 const totals = { pickups: 0, fires: 0, hits: 0, kills: 0, wrongWay: 0 };
 const lapTimes: number[] = [];
+let dnf = 0;
 const t0 = performance.now();
 for (let r = 0; r < races; r++) {
   const seed = seed0 + r;
@@ -70,6 +71,7 @@ for (let r = 0; r < races; r++) {
   const credited = runner.state.trucks.reduce((s, t) => s + t.kills, 0);
   if (credited !== creditable) fail(`kills credited ${credited} but ${creditable} kill events by others`);
   if (runner.state.phase !== 'finished') fail(`did not finish; placements ${runner.state.placements.join(',')} laps ${runner.state.trucks.map((t) => t.laps).join(',')}`);
+  dnf += runner.state.trucks.filter((t) => !t.finishedTick).length;
   totals.pickups += pickups; totals.fires += fires; totals.hits += hitsN; totals.kills += kills; totals.wrongWay += wrongWay;
 }
 const secs = (performance.now() - t0) / 1000;
@@ -77,6 +79,7 @@ lapTimes.sort((a, b) => a - b);
 const q = (p: number) => lapTimes[Math.floor(p * (lapTimes.length - 1))]?.toFixed(1);
 console.log(`${races} races, ${totalTicks} ticks in ${secs.toFixed(2)} s (${Math.round(totalTicks / secs)} ticks/s, ${(totalTicks / 30 / secs).toFixed(0)}x realtime)`);
 console.log(`lap time s: min ${q(0)} p50 ${q(0.5)} p90 ${q(0.9)} max ${q(1)}; race length s: ${(totalTicks / races / 30).toFixed(1)} avg`);
+console.log(`did not finish: ${((100 * dnf) / (races * n)).toFixed(0)} % of trucks`);
 console.log(`max wall penetration ${maxPenetration.toFixed(2)} u`);
 console.log(`per race: ${(totals.pickups / races).toFixed(1)} pickups, ${(totals.fires / races).toFixed(1)} fires, ${(totals.hits / races).toFixed(1)} hits, ${(totals.kills / races).toFixed(1)} kills, ${(totals.wrongWay / races).toFixed(1)} wrong-way`);
 console.log(failures ? `FAIL: ${failures} invariant failures` : 'OK: no invariant failures');
