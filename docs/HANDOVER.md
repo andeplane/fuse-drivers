@@ -17,6 +17,12 @@ joystick N, sound 1, then Space through the intro; the attract demo shows a race
 race clock runs at real time, the leader crosses the 320 px screen in about 3.3 s (~96 px/s) and laps take
 about 11 s, so by screen crossings the old 320 u/s speed matched it; "too slow"/"too fast" is the user's call.
 Camera looks down from the south at an angle, walls are raised, trucks are ~7 % of the screen width.
+A second measurement (canvas frames captured at ~14 fps from the attract race, median background subtracted,
+moving blobs tracked) gave trucks of 23x15 px on the 320x200 screen and a median moving speed of 110-130 px/s,
+i.e. 2.5-3 s to cross the screen. Ours: 200 u/s over a 1024 u world is 5 s (old 320 u/s: 3.2 s); trucks are
+44 u = 4.3 % of the width (old 66 u = 6.4 %). Turn rate could not be measured: the tracker swaps trucks when
+they bunch. So the original is not slower on paper; if the user still says ours feels too fast, look at
+acceleration, camera zoom and lane width rather than top speed alone.
 The user suggested downloading and reverse engineering the game; declined (untrusted download, copyrighted).
 
 ## Next
