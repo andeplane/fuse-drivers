@@ -7,7 +7,7 @@ from PIL import Image
 
 RAW = Path('assets/raw'); OUT = Path('public/assets'); OUT.mkdir(parents=True, exist_ok=True)
 TILE = 128            # on-disk tile size; 32 world units
-TRUCK_CELL = 256      # 16-direction sheet cell size
+TRUCK_CELL = 256      # top-down truck sprite size
 SURFACES = ['dirt', 'tarmac', 'mud', 'water', 'oil', 'boost', 'toxic', 'mogul', 'ramp']  # gid = index + 1, must match make-track.ts
 
 def fit(im, size):
@@ -51,46 +51,15 @@ def bands(mask, axis):
     if start is not None: out.append((start, len(proj)))
     return out
 
-def tilted_frames():
-    """Truck frames drawn from the arcade's elevated camera (assets/raw/trucks-tilted/README.md), in sheet order
-    frame 0 = driving up the screen, clockwise in 22.5 degree steps. The 8 main headings come from cyan-8dir-try1
-    (real alpha, a soft glow that is cut away), the in-between headings from cyan-8dir-between (flat magenta key)."""
-    import numpy as np
-    def clean(im, key_magenta):
-        a = np.array(im.convert('RGBA'))
-        if key_magenta:
-            r, g, b = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int)
-            a[((r > 180) & (b > 180) & (g < 110)) | ((r > 140) & (b > 140) & (g < (r + b) // 2 - 50))] = 0  # key plus pink fringe
-        r, g, b = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int)
-        a[(r > g + 40) & (b > g + 40) & (abs(r - b) < 90) & (g < 120)] = 0  # purple fringe left by the magenta key
-        a[a[..., 3] < 160] = 0
-        return Image.fromarray(a)
-    def sprites(name, key_magenta):
-        im = clean(Image.open(RAW / 'trucks-tilted' / f'{name}.png'), key_magenta)
-        a = np.array(im)[:, :, 3] > 0
-        out = []
-        for (y0, y1) in bands(a, 1):
-            if y1 - y0 < 80: continue
-            row = [(x0, x1) for (x0, x1) in bands(a[y0:y1], 0) if x1 - x0 >= 80]
-            out += [im.crop((x0, y0, x1, y1)) for (x0, x1) in row]
-        return [s.crop(s.getbbox()) for s in out]
-    main = sprites('cyan-8dir-try1', False)
-    between = sprites('cyan-8dir-between', True)
-    assert len(main) == 8 and len(between) == 8, f'expected 8 + 8 trucks, found {len(main)} + {len(between)}'
-    flip = lambda s: s.transpose(Image.FLIP_LEFT_RIGHT)
-    # Right-hand half (up, clockwise to straight down) from the cells whose heading came out right; the between
-    # sheet's third cell faces down-left, so it is mirrored. The left half mirrors the right, so turning is symmetric.
-    right = [main[0], between[0], main[1], between[1], main[2], flip(between[2]), main[3], between[3], main[4]]
-    return right + [flip(right[16 - i]) for i in range(9, 16)]
-
-# Trucks: every frame shares one scale and sits on one baseline, so the truck neither grows nor hops when it turns.
-frames = tilted_frames()
-scale = TRUCK_CELL * 0.92 / max(max(f.size) for f in frames)
-cyan = Image.new('RGBA', (4 * TRUCK_CELL, 4 * TRUCK_CELL), (0, 0, 0, 0))
-for i, f in enumerate(frames):
-    f = f.resize((max(1, round(f.width * scale)), max(1, round(f.height * scale))), Image.LANCZOS)
-    x = (i % 4) * TRUCK_CELL + (TRUCK_CELL - f.width) // 2
-    cyan.alpha_composite(f, (x, (i // 4) * TRUCK_CELL + (TRUCK_CELL - f.height) // 2))
+# Trucks: one strict top-down sprite, nose up (assets/raw/trucks-rotate/README.md). The game rotates it to any
+# heading, so turning is continuous instead of snapping between drawn directions.
+top = Image.open(RAW / 'trucks-rotate' / 'cyan-topdown.png').convert('RGBA')
+top.putalpha(top.getchannel('A').point(lambda v: 255 if v >= 160 else 0))  # cut the soft glow
+top = top.crop(top.getbbox())
+scale = TRUCK_CELL * 0.92 / max(top.size)
+top = top.resize((round(top.width * scale), round(top.height * scale)), Image.LANCZOS)
+cyan = Image.new('RGBA', (TRUCK_CELL, TRUCK_CELL), (0, 0, 0, 0))
+cyan.alpha_composite(top, ((TRUCK_CELL - top.width) // 2, (TRUCK_CELL - top.height) // 2))
 cyan.save(OUT / 'truck-cyan.png')
 import importlib.util
 spec = importlib.util.spec_from_file_location('recolor', RAW / 'trucks' / 'recolor.py'); recolor = importlib.util.module_from_spec(spec); spec.loader.exec_module(recolor)

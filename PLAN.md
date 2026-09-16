@@ -40,7 +40,7 @@ Mirror and reverse variants triple the count at build time.
 
 ## Art
 
-Chosen style: **arcade 1989**, `docs/concepts/style-02-arcade-1989.png`. Authentic late-80s arcade pixel art, chunky 16-color palette, thick black outlines, brown stadium dirt, red-and-white lane barriers, a crowd and sponsor banners around the edge, bold bitmap HUD. Strict overhead camera; sprites must read from a couch. `assets/raw/STYLE.md` is the brief every generated asset follows; raw generations live in `assets/raw/`, game-ready cuts in `public/assets/`. 32 px tileset, five palette-swapped truck sheets in 16 directions, item icons, effect sheets, Press Start 2P for HUD text.
+Chosen style: **arcade 1989**, `docs/concepts/style-02-arcade-1989.png`. Authentic late-80s arcade pixel art, chunky 16-color palette, thick black outlines, brown stadium dirt, red-and-white lane barriers, a crowd and sponsor banners around the edge, bold bitmap HUD. Strict overhead camera; sprites must read from a couch. `assets/raw/STYLE.md` is the brief every generated asset follows; raw generations live in `assets/raw/`, game-ready cuts in `public/assets/`. 32 px tileset, five palette-swapped top-down truck sprites rotated in game, item icons, effect sheets, Press Start 2P for HUD text.
 
 ## Milestones
 
@@ -62,5 +62,5 @@ Each is playable before the next starts.
 - Throttle always on, two turn buttons, drift from held turns.
 - Only weapons kill; hazards chip. Kills are bragging rights and $100.
 - Live progress ranking during the race (ADR 003).
-- Truck sprites pre-rendered in 16 directions (ADR 001).
+- Truck sprites rotate continuously from one top-down image (ADR 001).
 - Repo starts empty; port files from Fuse Riders one at a time as needed.

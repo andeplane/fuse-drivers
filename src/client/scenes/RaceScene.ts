@@ -9,11 +9,15 @@ import type { Point, Segment, Track } from '../../shared/track.ts';
 import { createKeyboard } from '../input/keyboard.ts';
 import { createTouchControls } from '../input/touch.ts';
 import type { PartyData } from '../net/party.ts';
-import { headingFrame, renderSnapshot } from '../render/interpolate.ts';
+import { renderSnapshot } from '../render/interpolate.ts';
 import { FRAMES, SPRITE_CELL, TRUCK_CELL, TRUCK_COLORS } from './BootScene.ts';
 
-/** World units per sprite cell: tilted trucks draw well beyond their 28 u collision circle, chunky like the concept. */
-const TRUCK_SCALE = 66 / (TRUCK_CELL * 0.95);
+/** World units per sprite cell: a 44 u long top-down truck around its 28 u collision circle. */
+const TRUCK_SCALE = 44 / (TRUCK_CELL * 0.92);
+/** The arcade camera looks down at an angle: a rotated truck is squashed vertically after rotation... */
+const TILT = 0.72;
+/** ...and stacked on darker copies of itself, one per layer, so its sides show below the roof. */
+const SIDE_LAYERS = 5;
 /** World units per sprite pixel for the 128 px item cells: a mine or box is about 36 u across. */
 const SPRITE_SCALE = 36 / SPRITE_CELL;
 
@@ -60,7 +64,10 @@ export interface SeriesData { series: Series; tracks: Record<string, Track> }
 export class RaceScene extends Phaser.Scene {
   runner!: RaceRunner;
   track!: Track;
-  sprites: Phaser.GameObjects.Sprite[] = [];
+  /** Each truck: shadow, side layers and body in a container squashed by TILT. */
+  trucks: Phaser.GameObjects.Container[] = [];
+  sprites: Phaser.GameObjects.Image[] = [];
+  sides: Phaser.GameObjects.Image[][] = [];
   shields: Phaser.GameObjects.Image[] = [];
   /** Burnt wreck shown where a destroyed truck died until it respawns. */
   wrecks: Phaser.GameObjects.Image[] = [];
@@ -70,9 +77,8 @@ export class RaceScene extends Phaser.Scene {
   oils = new Map<number, Phaser.GameObjects.Image>();
   drones = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
-  /** Soft ground shadows under every truck: one layer on the ground, one above the bridge deck. */
-  shadowsLow!: Phaser.GameObjects.Graphics;
-  shadowsHigh!: Phaser.GameObjects.Graphics;
+  /** A dark copy of each truck offset below it. */
+  shadows: Phaser.GameObjects.Image[] = [];
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   /** Recent sim positions per missile, for the dotted trail. */
   trails = new Map<number, { x: number; y: number }[]>();
@@ -128,17 +134,21 @@ export class RaceScene extends Phaser.Scene {
     this.cameras.main.setViewport((config.screen.width - worldW * zoom) / 2, config.screen.height - worldH * zoom, worldW * zoom, worldH * zoom).setZoom(zoom).centerOn(worldW / 2, worldH / 2);
     this.trails.clear();
     this.lastTick = -1;
-    this.shadowsLow = this.add.graphics().setDepth(9);
-    this.shadowsHigh = this.add.graphics().setDepth(14);
     this.dust = this.add.particles(0, 0, 'dust', {
       frame: [...FRAMES.dust], lifespan: 450, speed: { min: 5, max: 30 }, scale: { start: SPRITE_SCALE * 0.5, end: SPRITE_SCALE * 0.9 }, alpha: { start: 0.7, end: 0 }, emitting: false,
     }).setDepth(8);
-    this.sprites = TRUCK_COLORS.map((c, i) => {
+    this.sprites = []; this.sides = []; this.shadows = [];
+    this.trucks = TRUCK_COLORS.map((c, i) => {
       const t = this.runner.state.trucks[i];
-      return this.add.sprite(t.x, t.y, `truck-${c}`, 0).setScale(TRUCK_SCALE).setDepth(10);
+      const copy = () => this.add.image(0, 0, `truck-${c}`).setScale(TRUCK_SCALE);
+      const shadow = copy().setTint(0x000000).setAlpha(0.35);
+      const sides = Array.from({ length: SIDE_LAYERS }, (_, k) => copy().setTint(k === 0 ? 0x202028 : 0x50505c).setY(-k));
+      const body = copy().setY(-SIDE_LAYERS);
+      this.shadows.push(shadow); this.sides.push(sides); this.sprites.push(body);
+      return this.add.container(t.x, t.y, [shadow, ...sides, body]).setScale(1, TILT).setDepth(10);
     });
-    this.wrecks = this.textures.exists('wreck') ? this.sprites.map(() => this.add.image(0, 0, 'wreck').setScale(TRUCK_SCALE * 1.05).setDepth(10).setVisible(false)) : [];
-    this.shields = this.sprites.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 2.2).setAlpha(0.55).setDepth(11).setVisible(false));
+    this.wrecks = this.textures.exists('wreck') ? this.trucks.map(() => this.add.image(0, 0, 'wreck').setScale(TRUCK_SCALE * 1.05).setDepth(10).setVisible(false)) : [];
+    this.shields = this.trucks.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 2.2).setAlpha(0.55).setDepth(11).setVisible(false));
     this.boxes = this.track.items.map((p) => this.add.sprite(p.x, p.y, 'itembox', 0).setScale(SPRITE_SCALE).setDepth(4).play('box-pulse'));
     this.marks = this.add.graphics().setDepth(12);
     // Dropped oil uses the same glossy slick as the track's oil patches instead of the flat top-down splat.
@@ -630,29 +640,28 @@ export class RaceScene extends Phaser.Scene {
         this.tweens.add({ targets: ring, scale: (config.items.emp.range * 2) / SPRITE_CELL, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
       }
       if (e.type === 'hit' && !e.absorbed && e.item !== 'drone' && e.item !== 'emp') {
-        // Spin-outs show by cycling direction frames in the pose loop; a rotated tilted sprite would look wrong.
         this.cameras.main.shake(120, 0.002);
       }
     }
     const poses = renderSnapshot(this.runner.previous, state, this.runner.alpha);
     this.marks.clear();
-    this.shadowsLow.clear();
-    this.shadowsHigh.clear();
     // Cosmetic effects sample once per sim tick so their density does not depend on the display frame rate.
     const newTick = state.tick !== this.lastTick;
     this.lastTick = state.tick;
     poses.forEach((p, i) => {
       const t = state.trucks[i];
       const air = state.tick < t.airborneUntilTick;
-      if (!t.respawnAtTick) {
-        // Grounds the tilted sprite: an ellipse under the wheels, wider and fainter while airborne.
-        (t.onBridge ? this.shadowsHigh : this.shadowsLow).fillStyle(0x000000, air ? 0.22 : 0.38).fillEllipse(p.x + (air ? 6 : 2), p.y + 16, air ? 54 : 46, air ? 20 : 16);
-      }
       if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
-      this.sprites[i].setPosition(p.x, p.y - (air ? 12 : 0)).setFrame(state.tick < t.spinUntilTick ? (headingFrame(p.heading) + Math.floor(state.tick / 2)) % 16 : headingFrame(p.heading)).setScale(TRUCK_SCALE).setVisible(!(t.respawnAtTick && this.wrecks[i])).setDepth(t.onBridge ? 15 : 10);
+      // Sprite nose points up; heading 0 points right. A spin-out whirls the truck around its heading.
+      const rotation = p.heading + Math.PI / 2 + (state.tick < t.spinUntilTick ? (t.spinUntilTick - state.tick - this.runner.alpha) * 0.5 : 0);
+      const lift = air ? 12 : 0, grow = air ? 1.1 : 1;
+      // Shadow offsets are in the squashed container, so the ground offset is divided by TILT and cancels the lift.
+      this.shadows[i].setPosition(air ? 8 : 3, ((air ? 14 : 5) + lift) / (TILT * grow)).setRotation(rotation);
+      for (const layer of [...this.sides[i], this.sprites[i]]) layer.setRotation(rotation);
+      this.trucks[i].setPosition(p.x, p.y - lift).setScale(grow, grow * TILT).setVisible(!(t.respawnAtTick && this.wrecks[i])).setDepth(t.onBridge ? 15 : 10);
       this.wrecks[i]?.setPosition(p.x, p.y).setVisible(!!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
-      if (state.tick < t.invulnerableUntilTick) this.sprites[i].setAlpha(state.tick % 6 < 3 ? 0.35 : 1); else this.sprites[i].setAlpha(1);
+      this.trucks[i].setAlpha(state.tick < t.invulnerableUntilTick && state.tick % 6 < 3 ? 0.35 : 1);
       // A wrecked truck stays where it died as a charred hulk until it respawns at the last checkpoint.
       this.sprites[i].setTint(t.respawnAtTick ? 0x3a302a : state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
       if (t.lockedUntilTick > state.tick && !t.respawnAtTick) this.drawLock(p.x, p.y);

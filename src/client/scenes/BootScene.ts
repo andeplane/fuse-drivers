@@ -30,7 +30,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('grandstand', 'assets/grandstand.png');
     this.load.image('fence', 'assets/fence.png');
     this.load.image('wreck', 'assets/wreck.png');
-    for (const c of TRUCK_COLORS) this.load.spritesheet(`truck-${c}`, `assets/truck-${c}.png`, { frameWidth: TRUCK_CELL, frameHeight: TRUCK_CELL });
+    for (const c of TRUCK_COLORS) this.load.image(`truck-${c}`, `assets/truck-${c}.png`);
     for (const n of ['itembox', 'projectiles', 'explosion', 'icons', 'dust', 'decor']) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: SPRITE_CELL, frameHeight: SPRITE_CELL });
     for (const [n, size] of Object.entries(HUD_CELL)) this.load.spritesheet(n, `assets/${n}.png`, { frameWidth: size, frameHeight: size });
     for (const p of PANELS) this.load.image(`panel-${p}`, `assets/panel-${p}.png`);

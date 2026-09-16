@@ -16,8 +16,3 @@ export function renderTruck(prev: Truck | undefined, next: Truck, nextTick: numb
 export function renderSnapshot(prev: RaceState, next: RaceState, alpha: number): TruckPose[] {
   return next.trucks.map((t, i) => renderTruck(prev.trucks[i], t, next.tick, alpha));
 }
-
-/** Sprite frame for a heading: frame 0 points up, 16 frames clockwise (ADR 001). */
-export function headingFrame(heading: number): number {
-  return ((Math.round(((heading + Math.PI / 2) / (2 * Math.PI)) * 16) % 16) + 16) % 16;
-}
