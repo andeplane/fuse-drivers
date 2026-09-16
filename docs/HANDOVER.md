@@ -1,3 +1,35 @@
+# Handover — 2026-09-16 (server deployed; refactor next)
+
+## Done
+- Party server is **deployed**: Cloud Run service `fuse-drivers-server`, project `andershaf-87`, region
+  `europe-west1`, URL https://fuse-drivers-server-oaaqztec5a-ew.a.run.app (`/api/health` returned `{"ok":true,"rooms":0}`).
+  Deployed with `CLOUDSDK_CORE_DISABLE_PROMPTS=1 PROJECT=andershaf-87 scripts/deploy-server.sh`, active gcloud
+  account `andershaf@gmail.com` (not the work account). Single instance on purpose (rooms in memory).
+- Repo variable `VITE_PARTY_ORIGIN` set to that URL; Pages rebuilt successfully (run 35088358666).
+- Live game: https://andeplane.github.io/fuse-drivers/
+
+## NOT verified
+- Party mode end to end on the live site (TV page creates room, phone `pad.html` joins over wss). Do this first:
+  open the site, press P, open the QR/join URL in a second tab, confirm the seat appears and a race starts.
+  If the socket is refused, check `ALLOWED_ORIGINS=https://andeplane.github.io` on the service.
+
+## Active user goal
+"First deploy what we have so it works. Then refactor network architecture so it is similar to fuse-riders."
+Step 1 is deployed but unverified. Step 2 has not started.
+
+Fuse Riders (`~/projects/personal/slackgame`) architecture, per its `docs/online/GCP-DEPLOY.md` and ADR 035:
+static client on GitHub Pages; the room creator's browser runs the simulation (authority); gameplay goes over
+direct WebRTC data channels; the Cloud Run gateway (`fuse-riders-gateway`, same project) carries only room
+membership, service time and SDP/ICE signalling; Firestore for room metadata, Pub/Sub between gateway instances.
+This contradicts our ADR 008 (server-authoritative Node process). The user has set the goal explicitly, so
+write a new ADR superseding 008 first, then implement. Read Fuse Riders' current code (`src/online/`,
+`src/service/`) and its reviews in `docs/reviews/` before designing: the first message of the project said that
+network architecture had mistakes being corrected, so reuse its corrected state, not its early ADRs.
+Our `src/shared/runner.ts` is already pure and can run in the host browser unchanged; `src/shared/room.ts`
+(seat/input reducer) and `src/client/net/party.ts`, `src/pad/main.ts` are the pieces to rework.
+
+---
+
 # Handover — 2026-09-16 (deployment and scale)
 
 **Scale fixed.** Turn rate at top speed went from 180 to 240 deg/s: the full-speed radius was 102 u, wider
