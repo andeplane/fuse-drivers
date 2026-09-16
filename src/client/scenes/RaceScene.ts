@@ -165,16 +165,17 @@ export class RaceScene extends Phaser.Scene {
     const g = this.make.graphics({}, false);
     const barriers = this.track.walls.filter((w) => !w.deck);
     // Chunky blocks: black outline, a shaded side, a bright top face, black seams between blocks.
-    // 22 u wide: adjacent lanes are 115 u apart, so neighbouring barriers meet like the concept's double rows.
-    const block = 18, seam = (d: number) => d % block < 2;
+    // 14 u wide against a 90 u lane: a kerb the dirt dominates, as in the concept, not a wall as wide as a truck.
+    // Adjacent lanes sit 115 u apart, so two neighbouring kerbs leave a thin strip of dirt between them.
+    const block = 16, seam = (d: number) => d % block < 2;
     // Raised blocks seen from the arcade's elevated camera: a dark front face extruded below the top, then the lit top.
-    const RISE = 7;
+    const RISE = 5;
     const lift = (dy: number) => barriers.map((w) => ({ ...w, a: { x: w.a.x, y: w.a.y + dy }, b: { x: w.b.x, y: w.b.y + dy } }));
-    strokeWalls(g, lift(RISE), 22, () => 0x000000);
-    for (let dy = RISE; dy > 0; dy -= 2) strokeWalls(g, lift(dy), 17, (d) => (seam(d) ? 0x1a0a0a : Math.floor(d / block) % 2 ? 0x6e6e78 : 0x6a1010));
-    strokeWalls(g, barriers, 22, () => 0x000000);
-    strokeWalls(g, barriers, 17, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xb4b4be : 0xb41c1c));
-    strokeWalls(g, barriers, 10, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xffffff : 0xf03a3a));
+    strokeWalls(g, lift(RISE), 14, () => 0x000000);
+    for (let dy = RISE; dy > 0; dy -= 2) strokeWalls(g, lift(dy), 10, (d) => (seam(d) ? 0x1a0a0a : Math.floor(d / block) % 2 ? 0x6e6e78 : 0x6a1010));
+    strokeWalls(g, barriers, 14, () => 0x000000);
+    strokeWalls(g, barriers, 10, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xb4b4be : 0xb41c1c));
+    strokeWalls(g, barriers, 6, (d) => (seam(d) ? 0x000000 : Math.floor(d / block) % 2 ? 0xffffff : 0xf03a3a));
     const finish = this.track.checkpoints[this.track.checkpoints.length - 1];
     const fl = Math.hypot(finish.b.x - finish.a.x, finish.b.y - finish.a.y), fx = (finish.b.x - finish.a.x) / fl, fy = (finish.b.y - finish.a.y) / fl;
     for (let d = 0, i = 0; d < fl; d += 8, i++) {
