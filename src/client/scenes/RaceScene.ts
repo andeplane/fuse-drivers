@@ -18,6 +18,8 @@ const TRUCK_SCALE = 44 / (TRUCK_CELL * 0.92);
 const TILT = 0.72;
 /** ...and stacked on darker copies of itself, one per layer, so its sides show below the roof. */
 const SIDE_LAYERS = 5;
+/** Two whole turns over a spin-out, so the whirl starts and ends on the truck's heading. */
+const SPIN_PER_TICK = (4 * Math.PI) / config.truck.spinOutTicks;
 /** World units per sprite pixel for the 128 px item cells: a mine or box is about 36 u across. */
 const SPRITE_SCALE = 36 / SPRITE_CELL;
 
@@ -147,7 +149,7 @@ export class RaceScene extends Phaser.Scene {
       this.shadows.push(shadow); this.sides.push(sides); this.sprites.push(body);
       return this.add.container(t.x, t.y, [shadow, ...sides, body]).setScale(1, TILT).setDepth(10);
     });
-    this.wrecks = this.textures.exists('wreck') ? this.trucks.map(() => this.add.image(0, 0, 'wreck').setScale(TRUCK_SCALE * 1.05).setDepth(10).setVisible(false)) : [];
+    this.wrecks = this.textures.exists('wreck') ? this.trucks.map(() => this.add.image(0, 0, 'wreck').setScale(TRUCK_SCALE * 1.2).setDepth(10).setVisible(false)) : [];
     this.shields = this.trucks.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 2.2).setAlpha(0.55).setDepth(11).setVisible(false));
     this.boxes = this.track.items.map((p) => this.add.sprite(p.x, p.y, 'itembox', 0).setScale(SPRITE_SCALE).setDepth(4).play('box-pulse'));
     this.marks = this.add.graphics().setDepth(12);
@@ -653,16 +655,15 @@ export class RaceScene extends Phaser.Scene {
       const air = state.tick < t.airborneUntilTick;
       if (newTick && !air && !t.respawnAtTick && t.speed > t.stats.topSpeed * 0.6) this.dust.emitParticleAt(p.x - Math.cos(p.heading) * 20, p.y - Math.sin(p.heading) * 20);
       // Sprite nose points up; heading 0 points right. A spin-out whirls the truck around its heading.
-      const rotation = p.heading + Math.PI / 2 + (state.tick < t.spinUntilTick ? (t.spinUntilTick - state.tick - this.runner.alpha) * 0.5 : 0);
+      const rotation = p.heading + Math.PI / 2 + (state.tick < t.spinUntilTick ? (t.spinUntilTick - state.tick - this.runner.alpha) * SPIN_PER_TICK : 0);
       const lift = air ? 12 : 0, grow = air ? 1.1 : 1;
       // Shadow offsets are in the squashed container, so the ground offset is divided by TILT and cancels the lift.
       this.shadows[i].setPosition(air ? 8 : 3, ((air ? 14 : 5) + lift) / (TILT * grow)).setRotation(rotation);
       for (const layer of [...this.sides[i], this.sprites[i]]) layer.setRotation(rotation);
-      this.trucks[i].setPosition(p.x, p.y - lift).setScale(grow, grow * TILT).setVisible(!(t.respawnAtTick && this.wrecks[i])).setDepth(t.onBridge ? 15 : 10);
+      this.trucks[i].setPosition(p.x, p.y - lift).setScale(grow, grow * TILT).setVisible(!(t.respawnAtTick && this.wrecks[i]) && !(state.tick < t.invulnerableUntilTick && state.tick % 6 < 3)).setDepth(t.onBridge ? 15 : 10);
       this.wrecks[i]?.setPosition(p.x, p.y).setVisible(!!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
       this.shields[i].setPosition(p.x, p.y).setVisible(!t.respawnAtTick && state.tick < t.shieldUntilTick);
-      this.trucks[i].setAlpha(state.tick < t.invulnerableUntilTick && state.tick % 6 < 3 ? 0.35 : 1);
-      // A wrecked truck stays where it died as a charred hulk until it respawns at the last checkpoint.
+            // A wrecked truck stays where it died as a charred hulk until it respawns at the last checkpoint.
       this.sprites[i].setTint(t.respawnAtTick ? 0x3a302a : state.tick < t.stunUntilTick ? 0x8080ff : 0xffffff);
       if (t.lockedUntilTick > state.tick && !t.respawnAtTick) this.drawLock(p.x, p.y);
     });

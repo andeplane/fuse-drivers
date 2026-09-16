@@ -22,7 +22,7 @@ const DELAY: Record<Difficulty, number> = { easy: 6, normal: 3, hard: 0 };
 const BRAKE_TAP: Record<Difficulty, number> = { easy: 3, normal: 1, hard: 0 };
 const STEER_DEADBAND = (6 * Math.PI) / 180;
 const STRAIGHT_CONE = (15 * Math.PI) / 180;
-const STRAIGHT_LENGTH = 600;
+const STRAIGHT_LENGTH = 375;
 const SHARP_TURN = (70 * Math.PI) / 180;
 
 export function createBotMemory(seed: number, slot: number): BotMemory {
