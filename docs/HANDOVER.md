@@ -1,4 +1,11 @@
-# Handover — 2026-09-16 (deployment)
+# Handover — 2026-09-16 (deployment and scale)
+
+**Scale fixed.** Turn rate at top speed went from 180 to 240 deg/s: the full-speed radius was 102 u, wider
+than the 90 u lane, so no truck could hold a line through a hairpin. It is now 76 u (44 u at 60 % speed).
+Tyres add 6 deg/s per level so five levels reach the at-rest rate. Barriers are drawn 14 u wide instead of
+22 u, so the dirt reads as the track. All nine layouts pass the simulator; replay hash updated. The user has
+not yet played these changes: ask them to, and change feel one step at a time (see memory note).
+
 
 The game is published at **https://andeplane.github.io/fuse-drivers/** from the public repo
 `andeplane/fuse-drivers`. `.github/workflows/pages.yml` typechecks, tests and publishes on every push
