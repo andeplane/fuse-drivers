@@ -53,14 +53,18 @@ def bands(mask, axis):
 
 # Trucks: one strict top-down sprite, nose up (assets/raw/trucks-rotate/README.md). The game rotates it to any
 # heading, so turning is continuous instead of snapping between drawn directions.
-top = Image.open(RAW / 'trucks-rotate' / 'cyan-topdown.png').convert('RGBA')
-top.putalpha(top.getchannel('A').point(lambda v: 255 if v >= 160 else 0))  # cut the soft glow
-top = top.crop(top.getbbox())
-scale = TRUCK_CELL * 0.92 / max(top.size)
-top = top.resize((round(top.width * scale), round(top.height * scale)), Image.LANCZOS)
-cyan = Image.new('RGBA', (TRUCK_CELL, TRUCK_CELL), (0, 0, 0, 0))
-cyan.alpha_composite(top, ((TRUCK_CELL - top.width) // 2, (TRUCK_CELL - top.height) // 2))
-cyan.save(OUT / 'truck-cyan.png')
+def topdown(name, out):
+    top = Image.open(RAW / 'trucks-rotate' / name).convert('RGBA')
+    top.putalpha(top.getchannel('A').point(lambda v: 255 if v >= 160 else 0))  # cut the soft glow
+    top = top.crop(top.getbbox())
+    scale = TRUCK_CELL * 0.92 / max(top.size)
+    top = top.resize((round(top.width * scale), round(top.height * scale)), Image.LANCZOS)
+    cell = Image.new('RGBA', (TRUCK_CELL, TRUCK_CELL), (0, 0, 0, 0))
+    cell.alpha_composite(top, ((TRUCK_CELL - top.width) // 2, (TRUCK_CELL - top.height) // 2))
+    cell.save(OUT / out)
+topdown('cyan-topdown.png', 'truck-cyan.png')
+# The burnt wreck has the truck's silhouette, so the game swaps it onto the same rotated, tilted stack.
+topdown('wreck-topdown.png', 'wreck.png')
 import importlib.util
 spec = importlib.util.spec_from_file_location('recolor', RAW / 'trucks' / 'recolor.py'); recolor = importlib.util.module_from_spec(spec); spec.loader.exec_module(recolor)
 for name, hexcolor in recolor.TARGETS.items(): recolor.recolor(OUT / 'truck-cyan.png', OUT / f'truck-{name}.png', hexcolor)
@@ -127,12 +131,6 @@ if tilted.exists():
     for i, c in enumerate([missile, smoke, mine_on, mine_off, drone, shield, None, emp]):
         strip.paste(oil if c is None else fit(c, 128), (i * 128, 0))
     strip.save(OUT / 'projectiles.png')
-# Wreck: a burnt truck on its roof from the elevated camera, shown while a destroyed truck waits to respawn.
-wreck = RAW / 'trucks-tilted' / 'wreck-tilted.png'
-if wreck.exists():
-    raw = np.array(Image.open(wreck).convert('RGBA'))
-    raw[raw[..., 3] < 150] = 0
-    fit(Image.fromarray(raw), TRUCK_CELL).save(OUT / 'wreck.png')
 # Stadium decor (assets/raw/tiles/README.md): drum, tyres, pipe, elbow, tank, cone, hay, sign, floodlight, puddle, clump, grass, crowd x3.
 print('decor sprites:', split_sheet('decor', 'tiles', 128))
 
