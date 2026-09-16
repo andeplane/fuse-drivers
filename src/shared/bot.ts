@@ -4,6 +4,7 @@ import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import type { RaceState } from './race.ts';
 import type { Point, Track } from './track.ts';
 import { wrapAngle, type Truck } from './truck.ts';
+import { atan2, cos, hypot, sin } from './fmath.ts';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -39,14 +40,14 @@ function closestSegment(wp: Point[], p: Point, first: number, count: number): { 
     const a = wp[i], b = wp[(i + 1) % n];
     const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1;
     const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
-    const d = Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+    const d = hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
     if (d < bestD) { bestD = d; best = i; bestAlong = t * Math.sqrt(len2); }
   }
   return { i: best, along: bestAlong };
 }
 
-const segmentLength = (wp: Point[], i: number) => { const a = wp[i % wp.length], b = wp[(i + 1) % wp.length]; return Math.hypot(b.x - a.x, b.y - a.y) || 1; };
-const tangentOf = (wp: Point[], i: number) => { const a = wp[i % wp.length], b = wp[(i + 1) % wp.length]; return Math.atan2(b.y - a.y, b.x - a.x); };
+const segmentLength = (wp: Point[], i: number) => { const a = wp[i % wp.length], b = wp[(i + 1) % wp.length]; return hypot(b.x - a.x, b.y - a.y) || 1; };
+const tangentOf = (wp: Point[], i: number) => { const a = wp[i % wp.length], b = wp[(i + 1) % wp.length]; return atan2(b.y - a.y, b.x - a.x); };
 
 /** Walk `distance` units forward along the closed polyline from segment `i`; returns the point and its tangent. */
 function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: number } {
@@ -56,10 +57,10 @@ function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: n
   let remaining = distance % perimeter;
   for (let k = 0; k < n; k++) {
     const a = wp[(i + k) % n], b = wp[(i + k + 1) % n];
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const len = hypot(b.x - a.x, b.y - a.y) || 1;
     if (remaining <= len) {
       const t = remaining / len;
-      return { p: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, tangent: Math.atan2(b.y - a.y, b.x - a.x) };
+      return { p: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, tangent: atan2(b.y - a.y, b.x - a.x) };
     }
     remaining -= len;
   }
@@ -70,7 +71,7 @@ function ahead(wp: Point[], i: number, distance: number): { p: Point; tangent: n
 function wantsItem(state: RaceState, t: Truck): boolean {
   if (!t.item || state.tick < t.airborneUntilTick) return false;
   const others = state.trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick && !o.finishedTick && state.tick >= o.invulnerableUntilTick);
-  const rel = (o: Truck) => ({ d: Math.hypot(o.x - t.x, o.y - t.y), a: Math.abs(wrapAngle(Math.atan2(o.y - t.y, o.x - t.x) - t.heading)) });
+  const rel = (o: Truck) => ({ d: hypot(o.x - t.x, o.y - t.y), a: Math.abs(wrapAngle(atan2(o.y - t.y, o.x - t.x) - t.heading)) });
   switch (t.item) {
     case 'missile': return others.some((o) => { const r = rel(o); return (r.d < 500 && r.a < config.items.missile.lockCone) || (r.d < 300 && r.a > Math.PI / 2); });
     case 'mine': case 'oil': return others.some((o) => { const r = rel(o); return r.d < 300 && r.a > Math.PI / 2; });
@@ -92,24 +93,24 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   // crosses itself (a bridge) the bot never follows the other level's branch through an under or deck wall.
   const cps = track.checkpoints, n = cps.length;
   // Nearest waypoint to a checkpoint's midpoint; a line through a vertex never strictly crosses a segment.
-  const vertexOf = (c: number) => { const m = cps[(c + n) % n].mid; let best = 0; wp.forEach((p, i) => { if (Math.hypot(p.x - m.x, p.y - m.y) < Math.hypot(wp[best].x - m.x, wp[best].y - m.y)) best = i; }); return best; };
+  const vertexOf = (c: number) => { const m = cps[(c + n) % n].mid; let best = 0; wp.forEach((p, i) => { if (hypot(p.x - m.x, p.y - m.y) < hypot(wp[best].x - m.x, wp[best].y - m.y)) best = i; }); return best; };
   const from = vertexOf(t.checkpoint - 1), to = vertexOf(t.checkpoint);
   const { i: segment, along } = closestSegment(wp, t, (from - 1 + wp.length) % wp.length, ((to - from + wp.length) % wp.length) + 2);
   // Shorten the lookahead until the target is visible, so a hairpin never aims through its inside wall.
   // The sight line is tested at both flanks of the truck too, so a target just past a wall tip is not "visible".
   const flank = 0.8 * config.truck.radius;
   const visible = (p: Point) => {
-    const len = Math.hypot(p.x - t.x, p.y - t.y) || 1, ox = (-(p.y - t.y) / len) * flank, oy = ((p.x - t.x) / len) * flank;
+    const len = hypot(p.x - t.x, p.y - t.y) || 1, ox = (-(p.y - t.y) / len) * flank, oy = ((p.x - t.x) / len) * flank;
     return [0, 1, -1].every((s) => !track.walls.some((w) => !(w.under && t.onBridge) && !(w.deck && !t.onBridge) && crosses({ x: t.x + ox * s, y: t.y + oy * s }, { x: p.x + ox * s, y: p.y + oy * s }, w)));
   };
   let target = t as Point;
   for (let d = Math.max(80, 0.35 * t.speed); d >= 30; d /= 2) {
     const look = ahead(wp, segment, along + d);
-    const nx = -Math.sin(look.tangent), ny = Math.cos(look.tangent);
+    const nx = -sin(look.tangent), ny = cos(look.tangent);
     target = { x: look.p.x + nx * memory.lateral, y: look.p.y + ny * memory.lateral };
     if (visible(target)) break;
   }
-  const err = wrapAngle(Math.atan2(target.y - t.y, target.x - t.x) - t.heading);
+  const err = wrapAngle(atan2(target.y - t.y, target.x - t.x) - t.heading);
 
   const here = tangentOf(wp, segment);
   let straight = true, sharp = false;
@@ -127,7 +128,7 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
   // back out for a second.
   let { anchorX, anchorY, anchorTick, reverseUntilTick } = memory;
   if (state.tick - anchorTick >= 30) {
-    const wedged = t.wallTicks >= 30 && Math.hypot(t.x - anchorX, t.y - anchorY) < 20 && !airborneOrSpun;
+    const wedged = t.wallTicks >= 30 && hypot(t.x - anchorX, t.y - anchorY) < 20 && !airborneOrSpun;
     if (wedged && state.tick >= reverseUntilTick) reverseUntilTick = state.tick + 30;
     anchorX = t.x; anchorY = t.y; anchorTick = state.tick;
   }
@@ -154,7 +155,7 @@ export function botInput(state: RaceState, slot: number, memory: BotMemory, trac
     brake: cornerBrake || (straight && state.tick % 30 < BRAKE_TAP[difficulty]),
     item: wantsItem(state, t),
     // Fire a missile backwards when the threat is behind and nobody is ahead in the cone.
-    itemAlt: t.item === 'missile' && !state.trucks.some((o) => o.slot !== t.slot && !o.respawnAtTick && Math.hypot(o.x - t.x, o.y - t.y) < 500 && Math.abs(wrapAngle(Math.atan2(o.y - t.y, o.x - t.x) - t.heading)) < config.items.missile.lockCone),
+    itemAlt: t.item === 'missile' && !state.trucks.some((o) => o.slot !== t.slot && !o.respawnAtTick && hypot(o.x - t.x, o.y - t.y) < 500 && Math.abs(wrapAngle(atan2(o.y - t.y, o.x - t.x) - t.heading)) < config.items.missile.lockCone),
   };
   const delay = DELAY[difficulty];
   const queue = [...memory.queue, decided].slice(-(delay + 1));

@@ -1,6 +1,7 @@
 import { BASE_STATS, config, DT, type SurfaceKind, type TruckStats } from './config.ts';
 import type { TruckInput } from './input.ts';
 import { nextRandom } from './rng.ts';
+import { cos, sin } from './fmath.ts';
 
 export type ItemKind = 'mine' | 'oil' | 'nitro' | 'shield' | 'missile' | 'drone' | 'emp';
 
@@ -64,7 +65,8 @@ export function createTruck(slot: number, x: number, y: number, heading: number,
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-export const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a)) + 0;
+/** Angle in [-pi, pi), by exact arithmetic so it is bit-identical on every platform (fmath.ts). */
+export const wrapAngle = (a: number) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI)) + 0;
 
 /**
  * Turn-then-move kernel (ADR 004). Pure: returns the moved truck and the new RNG state.
@@ -140,8 +142,8 @@ export function stepTruck(t: Truck, input: TruckInput, surface: SurfaceKind, tic
   if (driftDir !== 0) mul *= c.driftSpeedMul;
   if (!nitroActive && !airborne) mul *= surf.speed;
 
-  const x = t.x + Math.cos(moveHeading) * speed * mul * DT;
-  const y = t.y + Math.sin(moveHeading) * speed * mul * DT;
+  const x = t.x + cos(moveHeading) * speed * mul * DT;
+  const y = t.y + sin(moveHeading) * speed * mul * DT;
 
   return [{ ...t, x, y, heading, speed, nitros, nitrosUsed, nitroUntilTick, boostUntilTick, turnDir: dir, turnHeldTicks, driftDir, driftTicks, prevNitro: input.nitro }, rng];
 }

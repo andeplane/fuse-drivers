@@ -3,6 +3,7 @@ import { nextRandom } from './rng.ts';
 import { closestOnSegment, crosses } from './geometry.ts';
 import { insideAnyBridge, type Point, type Track } from './track.ts';
 import { wrapAngle, type ItemKind, type Truck } from './truck.ts';
+import { atan2, cos, hypot, sin } from './fmath.ts';
 
 export interface Missile { id: number; owner: number; x: number; y: number; heading: number; launchedTick: number; target: number | null; onBridge: boolean }
 export interface Mine { id: number; owner: number; x: number; y: number; droppedTick: number; onBridge: boolean }
@@ -33,9 +34,9 @@ function nearestTargetAhead(owner: Truck, trucks: Truck[], tick: number): number
   for (const t of trucks) {
     if (t.slot === owner.slot || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick) continue;
     const dx = t.x - owner.x, dy = t.y - owner.y;
-    const d = Math.hypot(dx, dy);
+    const d = hypot(dx, dy);
     if (d > m.lockRange || d >= bestD) continue;
-    if (Math.abs(wrapAngle(Math.atan2(dy, dx) - owner.heading)) > m.lockCone) continue;
+    if (Math.abs(wrapAngle(atan2(dy, dx) - owner.heading)) > m.lockCone) continue;
     best = t.slot; bestD = d;
   }
   return best;
@@ -57,19 +58,19 @@ export function useItem(t: Truck, alt: boolean, trucks: Truck[], world: World, t
       return { ...none, truck: { ...t, item: null, shieldUntilTick: tick + c.shieldTicks } };
     case 'mine': {
       const d = alt ? c.mine.lobAhead : -c.mine.dropBehind;
-      const mine: Mine = { id: nextId, owner: t.slot, x: t.x + Math.cos(t.heading) * d, y: t.y + Math.sin(t.heading) * d, droppedTick: tick, onBridge: false };
+      const mine: Mine = { id: nextId, owner: t.slot, x: t.x + cos(t.heading) * d, y: t.y + sin(t.heading) * d, droppedTick: tick, onBridge: false };
       mine.onBridge = t.onBridge && insideAnyBridge(track, mine);
       return { ...none, truck: { ...t, item: null }, mines: [...mines, mine], nextId: nextId + 1 };
     }
     case 'oil': {
       const d = alt ? c.mine.lobAhead : -c.mine.dropBehind;
-      const oil: OilSlick = { id: nextId, owner: t.slot, x: t.x + Math.cos(t.heading) * d, y: t.y + Math.sin(t.heading) * d, droppedTick: tick };
+      const oil: OilSlick = { id: nextId, owner: t.slot, x: t.x + cos(t.heading) * d, y: t.y + sin(t.heading) * d, droppedTick: tick };
       return { ...none, truck: { ...t, item: null }, oils: [...oils, oil], nextId: nextId + 1 };
     }
     case 'drone':
       return { ...none, truck: { ...t, item: null }, drones: [...drones, { id: nextId, owner: t.slot, launchedTick: tick, zaps: 0, lastZapTick: trucks.map(() => 0) }], nextId: nextId + 1 };
     case 'emp': {
-      const stunned = trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick && !o.finishedTick && tick >= o.invulnerableUntilTick && Math.hypot(o.x - t.x, o.y - t.y) <= c.emp.range).map((o) => o.slot);
+      const stunned = trucks.filter((o) => o.slot !== t.slot && !o.respawnAtTick && !o.finishedTick && tick >= o.invulnerableUntilTick && hypot(o.x - t.x, o.y - t.y) <= c.emp.range).map((o) => o.slot);
       return { ...none, truck: { ...t, item: null }, stunned };
     }
     case 'missile': {
@@ -93,18 +94,18 @@ export function stepMissiles(missiles: Missile[], trucks: Truck[], track: Track,
     let heading = p.heading;
     const target = p.target === null ? undefined : trucks[p.target];
     if (target && !target.respawnAtTick) {
-      const err = wrapAngle(Math.atan2(target.y - p.y, target.x - p.x) - heading);
+      const err = wrapAngle(atan2(target.y - p.y, target.x - p.x) - heading);
       heading = wrapAngle(heading + Math.sign(err) * Math.min(Math.abs(err), m.turnRate * DT));
     }
     const from: Point = { x: p.x, y: p.y };
-    const to: Point = { x: p.x + Math.cos(heading) * m.speed * DT, y: p.y + Math.sin(heading) * m.speed * DT };
+    const to: Point = { x: p.x + cos(heading) * m.speed * DT, y: p.y + sin(heading) * m.speed * DT };
     if (track.walls.some((w) => !(w.under && p.onBridge) && !(w.deck && !p.onBridge) && crosses(from, to, w))) continue;
     let hit: Truck | undefined;
     if (tick - p.launchedTick >= m.armTicks) {
       hit = trucks.find((t) => {
         if (t.slot === p.owner || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick || t.onBridge !== p.onBridge) return false;
         const c = closestOnSegment(t, { a: from, b: to });
-        return Math.hypot(t.x - c.x, t.y - c.y) < m.radius + config.truck.radius;
+        return hypot(t.x - c.x, t.y - c.y) < m.radius + config.truck.radius;
       });
     }
     if (hit) { hits.push({ id: p.id, slot: hit.slot, by: p.owner, item: 'missile' }); continue; }
@@ -121,7 +122,7 @@ export function stepMines(mines: Mine[], trucks: Truck[], tick: number): { mines
   for (const mine of mines) {
     if (tick - mine.droppedTick > c.lifeTicks) continue;
     if (tick - mine.droppedTick >= c.armTicks) {
-      const victim = trucks.find((t) => !t.respawnAtTick && !t.finishedTick && tick >= t.invulnerableUntilTick && t.onBridge === mine.onBridge && Math.hypot(t.x - mine.x, t.y - mine.y) < c.radius + config.truck.radius);
+      const victim = trucks.find((t) => !t.respawnAtTick && !t.finishedTick && tick >= t.invulnerableUntilTick && t.onBridge === mine.onBridge && hypot(t.x - mine.x, t.y - mine.y) < c.radius + config.truck.radius);
       if (victim) { hits.push({ id: mine.id, slot: victim.slot, by: mine.owner, item: 'mine' }); continue; }
     }
     alive.push(mine);
@@ -143,7 +144,7 @@ export function stepDrones(drones: Drone[], trucks: Truck[], tick: number): { dr
     for (const t of trucks) {
       if (zaps >= c.maxZaps) break;
       if (t.slot === d.owner || t.respawnAtTick || t.finishedTick || tick < t.invulnerableUntilTick || tick - lastZapTick[t.slot] < c.zapIntervalTicks) continue;
-      if (Math.hypot(t.x - at.x, t.y - at.y) > c.range) continue;
+      if (hypot(t.x - at.x, t.y - at.y) > c.range) continue;
       hits.push({ id: d.id, slot: t.slot, by: d.owner, item: 'drone' });
       lastZapTick[t.slot] = tick;
       zaps += 1;
@@ -156,7 +157,7 @@ export function stepDrones(drones: Drone[], trucks: Truck[], tick: number): { dr
 /** Position of a drone this tick, for rendering and range: orbits the owner at fixed angular speed. */
 export function dronePosition(d: Drone, owner: Truck, tick: number): Point {
   const a = ((tick - d.launchedTick) / TICK_RATE) * Math.PI * 2 * config.items.drone.orbitHz;
-  return { x: owner.x + Math.cos(a) * config.items.drone.radius, y: owner.y + Math.sin(a) * config.items.drone.radius };
+  return { x: owner.x + cos(a) * config.items.drone.radius, y: owner.y + sin(a) * config.items.drone.radius };
 }
 
 export interface DamageResult { truck: Truck; absorbed: boolean; killed: boolean }

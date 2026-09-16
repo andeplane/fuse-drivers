@@ -4,6 +4,7 @@ import { NEUTRAL_INPUT, type TruckInput } from './input.ts';
 import { applyHit, rollItem, stepDrones, stepMines, stepMissiles, useItem, type Drone, type Hit, type Mine, type Missile, type OilSlick } from './items.ts';
 import { createTruck, stepTruck, wrapAngle, type ItemKind, type Truck } from './truck.ts';
 import { insideAnyBridge, surfaceAt, type Point, type Track } from './track.ts';
+import { atan2, cos, hypot, sin } from './fmath.ts';
 
 export { crosses } from './geometry.ts';
 
@@ -68,11 +69,11 @@ function resolveWalls(t: Truck, from: Point, track: Track, wasTouching: boolean)
       const startSide = Math.sign(ex * (from.y - w.a.y) - ey * (from.x - w.a.x)) || 1;
       const c = closestOnSegment({ x, y }, w);
       const dx = x - c.x, dy = y - c.y;
-      const d = Math.hypot(dx, dy);
+      const d = hypot(dx, dy);
       const tunneled = crosses(from, { x, y }, w);
       if (d >= r && !tunneled) continue;
       touched = true;
-      const len = Math.hypot(ex, ey) || 1;
+      const len = hypot(ex, ey) || 1;
       const nx = (-ey / len) * startSide, ny = (ex / len) * startSide;
       // Snap back to the start side only when the path really crossed this segment. Crossing just the infinite line beside a
       // short segment (the sharp tip of a hairpin barrier) would otherwise throw the truck through the neighbouring segments.
@@ -101,7 +102,7 @@ function resolveContacts(trucks: Truck[]): Truck[] {
       const a = out[i], b = out[j];
       if (a.respawnAtTick || b.respawnAtTick || a.finishedTick || b.finishedTick || a.onBridge !== b.onBridge) continue;
       const dx = b.x - a.x, dy = b.y - a.y;
-      const d = Math.hypot(dx, dy);
+      const d = hypot(dx, dy);
       if (d >= r2) continue;
       const nx = d < 1e-9 ? 1 : dx / d, ny = d < 1e-9 ? 0 : dy / d;
       const push = r2 - d;
@@ -124,7 +125,7 @@ function applySurface(t: Truck, track: Track, tick: number, events: RaceEvent[],
     events.push({ tick, type: 'land', slot: n.slot });
   }
   if (airborne) return n;
-  if (oils.some((o) => Math.hypot(o.x - t.x, o.y - t.y) <= config.items.oil.radius)) n = { ...n, oilUntilTick: tick + c.oilTicks };
+  if (oils.some((o) => hypot(o.x - t.x, o.y - t.y) <= config.items.oil.radius)) n = { ...n, oilUntilTick: tick + c.oilTicks };
   if (kind !== 'toxic' && n.toxicNextTick) n = { ...n, toxicNextTick: 0 };
   switch (kind) {
     case 'oil': return { ...n, oilUntilTick: tick + c.oilTicks };
@@ -167,7 +168,7 @@ export function trackDirectionAt(track: Track, p: Point): Point {
     if (d < bestD) { bestD = d; best = i; }
   }
   const a = wp[best], b = wp[(best + 1) % wp.length];
-  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const len = hypot(b.x - a.x, b.y - a.y) || 1;
   return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
 }
 
@@ -175,8 +176,8 @@ export function progressOf(t: Truck, track: Track): number {
   const n = track.checkpoints.length;
   const next = track.checkpoints[t.checkpoint];
   const last = track.checkpoints[(t.checkpoint - 1 + n) % n];
-  const span = Math.hypot(next.mid.x - last.mid.x, next.mid.y - last.mid.y) || 1;
-  const d = Math.max(0, Math.min(1, Math.hypot(next.mid.x - t.x, next.mid.y - t.y) / span));
+  const span = hypot(next.mid.x - last.mid.x, next.mid.y - last.mid.y) || 1;
+  const d = Math.max(0, Math.min(1, hypot(next.mid.x - t.x, next.mid.y - t.y) / span));
   return t.laps * n + t.checkpoint + (1 - d);
 }
 
@@ -198,7 +199,7 @@ function applyCheckpoints(prev: Truck, t: Truck, track: Track, tick: number, eve
     }
   }
   const along = trackDirectionAt(track, n2);
-  const facing = dot(Math.cos(n2.heading), Math.sin(n2.heading), along.x, along.y);
+  const facing = dot(cos(n2.heading), sin(n2.heading), along.x, along.y);
   const wrongWayTicks = facing < 0 && !n2.finishedTick ? n2.wrongWayTicks + 1 : 0;
   if (wrongWayTicks === config.truck.wrongWayTicks) events.push({ tick, type: 'wrongWay', slot: n2.slot });
   return { ...n2, wrongWayTicks, progress: progressOf(n2, track) };
@@ -208,7 +209,7 @@ export function respawnPose(t: Truck, track: Track): { x: number; y: number; hea
   const n = track.checkpoints.length;
   const last = track.checkpoints[(t.checkpoint - 1 + n) % n];
   const next = track.checkpoints[t.checkpoint];
-  return { x: last.mid.x, y: last.mid.y, heading: Math.atan2(next.mid.y - last.mid.y, next.mid.x - last.mid.x) };
+  return { x: last.mid.x, y: last.mid.y, heading: atan2(next.mid.y - last.mid.y, next.mid.x - last.mid.x) };
 }
 
 function rank(trucks: Truck[]): number[] {
@@ -313,7 +314,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   if (landers.length) {
     trucks = trucks.map((o) => {
       if (parked(o) || tick < o.invulnerableUntilTick || tick < o.spinUntilTick) return o;
-      const hit = landers.some((l) => l.slot !== o.slot && l.onBridge === o.onBridge && Math.hypot(l.x - o.x, l.y - o.y) <= config.truck.landingSpinRadius + 0.5);
+      const hit = landers.some((l) => l.slot !== o.slot && l.onBridge === o.onBridge && hypot(l.x - o.x, l.y - o.y) <= config.truck.landingSpinRadius + 0.5);
       if (!hit) return o;
       events.push({ tick, type: 'hit', slot: o.slot, by: -1, item: 'landing', absorbed: false });
       return { ...o, spinUntilTick: tick + config.truck.spinOutTicks, speed: o.speed * config.truck.spinOutSpeedMul, driftDir: 0, driftTicks: 0 };
@@ -325,7 +326,7 @@ export function step(state: RaceState, inputs: readonly TruckInput[], track: Tra
   const slots = trucks.length;
   trucks = trucks.map((t, i) => {
     if (parked(t) || t.item) return t;
-    const b = track.items.findIndex((box, k) => tick >= boxCooldowns[k * slots + i] && Math.hypot(box.x - t.x, box.y - t.y) < config.truck.radius + config.items.boxRadius);
+    const b = track.items.findIndex((box, k) => tick >= boxCooldowns[k * slots + i] && hypot(box.x - t.x, box.y - t.y) < config.truck.radius + config.items.boxRadius);
     if (b < 0) return t;
     const position = state.placements.indexOf(t.slot) + 1;
     const [item, next] = rollItem(position, slots, rng);

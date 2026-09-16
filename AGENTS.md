@@ -14,7 +14,7 @@ Fuse Drivers is a small TypeScript top-down offroad racing game for 1–5 friend
 
 Decided in ADR 001, 002 and 008. The two that matter every day:
 
-- `src/shared/` imports nothing from Phaser, the DOM or Node. Rules, kernel, items, race step, bots and the runner live there; Phaser only presents. Phaser physics, timers and `Math.random` never touch gameplay.
+- `src/shared/` imports nothing from Phaser, the DOM or Node. Rules, kernel, items, race step, bots and the runner live there; Phaser only presents. Phaser physics, timers and `Math.random` never touch gameplay, and `src/shared` takes `sin`, `cos`, `atan2` and `hypot` from `fmath.ts`, never `Math`, so results are bit-identical on every platform.
 - The tick order in ADR 002 is fixed. Outcomes resolve in that order and ties break by slot. Cosmetic changes must not alter simulation geometry, timing or player identity.
 
 Balance values live in `src/shared/config.ts` once it exists; docs link to it rather than copying tables. Tracks are Tiled data, not code.

@@ -26,7 +26,7 @@ Bots, replay tests, results that every viewer agrees on and a future authoritati
 
 ## Consequences
 
-Simultaneous outcomes are stable by construction. Floating-point determinism across browsers is adequate because there is never more than one authority; cross-engine bit-exactness is not required.
+Simultaneous outcomes are stable by construction. There is never more than one authority, so gameplay does not need cross-engine bit-exactness, but the recorded replay hash must hold on every machine that runs the tests (amended 2026-09-16: CI on Linux x64 failed a hash recorded on macOS arm64). `Math.sin`, `cos`, `atan2` and `hypot` may differ in the last bit between engines and builds, so `src/shared` uses `src/shared/fmath.ts`, built only from `+ - * /`, `sqrt`, `round` and `floor`, which IEEE 754 fixes exactly; a five-bot race now hashes identically on macOS arm64, Linux arm64 and Linux x64.
 
 ## Alternatives
 
