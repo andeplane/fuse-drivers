@@ -49,6 +49,31 @@ npm run build           # production bundle in dist/
 
 `src/shared` is the game: it imports nothing from Phaser or the DOM, so the same code runs in the browser, in tests, in the headless simulator and later on a server. `src/client` only renders and reads input. Tracks are Tiled maps; `scripts/make-track.ts` writes them from a centerline definition so they stay editable in Tiled.
 
+## Play online
+
+The game is published to GitHub Pages on every push to `main`: **https://andeplane.github.io/fuse-drivers/**
+
+Solo play and the five-race series are entirely client-side, so the published pages need no server.
+
+Party mode (phones as controllers on a TV) needs the Node server, because one authoritative process runs
+the simulation for every phone. It is the same shape Fuse Riders uses: static pages on GitHub Pages, a
+WebSocket backend in a container.
+
+```bash
+PROJECT=your-gcp-project scripts/deploy-server.sh
+```
+
+Then point the published game at it once, and rebuild the pages:
+
+```bash
+gh variable set VITE_PARTY_ORIGIN --body https://your-service.run.app
+gh workflow run pages.yml
+```
+
+Rooms live in the server's memory, so the service deliberately runs as a single instance; a second one
+would host its own rooms and phones would reach the wrong server. `ALLOWED_ORIGINS` lists the origins
+allowed to open a party socket, and `/api/health` reports liveness and the room count.
+
 ## Status
 
 Playable: three tracks with mirror and reverse variants, bots that lap all nine layouts cleanly, all seven items, damage and respawn, a five-race series with prize money and shop, party mode with phones as controllers (M3), synthesized sound, touch controls and an attract demo (M5).

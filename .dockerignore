@@ -1,8 +1,11 @@
+# The image needs the sources, tracks and lockfile; nothing else. Without this a --source deploy
+# would upload the 98 MB history and the 43 MB of raw art the build never reads.
+.git
+.github
 node_modules
 dist
-.git
-.claude
-.env
-assets/raw
-docs/concepts
-**/__pycache__
+assets
+docs
+tests
+artifacts
+*.md
