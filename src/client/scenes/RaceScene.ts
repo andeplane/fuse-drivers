@@ -66,7 +66,7 @@ export interface SeriesData { series: Series; tracks: Record<string, Track> }
 export class RaceScene extends Phaser.Scene {
   runner!: RaceRunner;
   track!: Track;
-  /** Each truck: shadow, side layers and body in a container squashed by TILT. */
+  /** Each truck: side layers and body in a container squashed by TILT. */
   trucks: Phaser.GameObjects.Container[] = [];
   sprites: Phaser.GameObjects.Image[] = [];
   sides: Phaser.GameObjects.Image[][] = [];
@@ -80,7 +80,7 @@ export class RaceScene extends Phaser.Scene {
   drones = new Map<number, Phaser.GameObjects.Image>();
   marks!: Phaser.GameObjects.Graphics;
   /** A dark copy of each truck offset below it. */
-  shadows: Phaser.GameObjects.Image[] = [];
+  shadows: Phaser.GameObjects.Container[] = [];
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   /** Recent sim positions per missile, for the dotted trail. */
   trails = new Map<number, { x: number; y: number }[]>();
@@ -143,11 +143,12 @@ export class RaceScene extends Phaser.Scene {
     this.trucks = TRUCK_COLORS.map((c, i) => {
       const t = this.runner.state.trucks[i];
       const copy = () => this.add.image(0, 0, `truck-${c}`).setScale(TRUCK_SCALE);
-      const shadow = copy().setTint(0x000000).setAlpha(0.35);
       const sides = Array.from({ length: SIDE_LAYERS }, (_, k) => copy().setTint(k === 0 ? 0x202028 : 0x50505c).setY(-k));
       const body = copy().setY(-SIDE_LAYERS);
-      this.shadows.push(shadow); this.sides.push(sides); this.sprites.push(body);
-      return this.add.container(t.x, t.y, [shadow, ...sides, body]).setScale(1, TILT).setDepth(10);
+      // Shadows get their own squashed container below every truck, so no truck draws its shadow over another.
+      this.shadows.push(this.add.container(t.x, t.y, [copy().setTint(0x000000).setAlpha(0.35)]).setScale(1, TILT).setDepth(9));
+      this.sides.push(sides); this.sprites.push(body);
+      return this.add.container(t.x, t.y, [...sides, body]).setScale(1, TILT).setDepth(10);
     });
     this.wrecks = this.textures.exists('wreck') ? this.trucks.map(() => this.add.image(0, 0, 'wreck').setScale(TRUCK_SCALE * 1.2).setDepth(10).setVisible(false)) : [];
     this.shields = this.trucks.map(() => this.add.image(0, 0, 'projectiles', FRAMES.projectiles.shield).setScale(SPRITE_SCALE * 2.2).setAlpha(0.55).setDepth(11).setVisible(false));
@@ -657,8 +658,8 @@ export class RaceScene extends Phaser.Scene {
       // Sprite nose points up; heading 0 points right. A spin-out whirls the truck around its heading.
       const rotation = p.heading + Math.PI / 2 + (state.tick < t.spinUntilTick ? (t.spinUntilTick - state.tick - this.runner.alpha) * SPIN_PER_TICK : 0);
       const lift = air ? 12 : 0, grow = air ? 1.1 : 1;
-      // Shadow offsets are in the squashed container, so the ground offset is divided by TILT and cancels the lift.
-      this.shadows[i].setPosition(air ? 8 : 3, ((air ? 14 : 5) + lift) / (TILT * grow)).setRotation(rotation);
+      this.shadows[i].setPosition(p.x + (air ? 8 : 3), p.y + (air ? 14 : 5)).setVisible(!t.respawnAtTick).setDepth(t.onBridge ? 14 : 9);
+      (this.shadows[i].list[0] as Phaser.GameObjects.Image).setRotation(rotation);
       for (const layer of [...this.sides[i], this.sprites[i]]) layer.setRotation(rotation);
       this.trucks[i].setPosition(p.x, p.y - lift).setScale(grow, grow * TILT).setVisible(!(t.respawnAtTick && this.wrecks[i]) && !(state.tick < t.invulnerableUntilTick && state.tick % 6 < 3)).setDepth(t.onBridge ? 15 : 10);
       this.wrecks[i]?.setPosition(p.x, p.y).setVisible(!!t.respawnAtTick).setDepth(t.onBridge ? 15 : 10);
