@@ -2,6 +2,7 @@
 import { createTouchControls, type TouchControls } from '../client/input/touch.ts';
 import type { TruckInput } from '../shared/input.ts';
 import { cost, UPGRADES, type Driver, type UpgradeKind } from '../shared/series.ts';
+import { partySocketUrl } from '../party-origin.ts';
 
 /** Same order as TRUCK_COLORS / COLOR_HEX in the display client. */
 const COLORS = ['#2ee6ff', '#ff4fa3', '#9cff2e', '#ff9a2e', '#b45cff'];
@@ -88,7 +89,7 @@ function onMessage(m: any) {
 function connect() {
   if (!code) { show('join'); return; }
   status('connecting…');
-  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  const socket = new WebSocket(partySocketUrl());
   ws = socket;
   socket.onopen = () => { status(''); send({ t: 'join', code, token: load(storageKey()) }); };
   socket.onmessage = (e) => { try { onMessage(JSON.parse(e.data)); } catch { /* ignore malformed */ } };

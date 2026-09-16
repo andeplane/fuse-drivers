@@ -143,7 +143,8 @@ const server = createServer((req, res) => {
   let path: string;
   try { path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname); } catch { res.writeHead(400).end(); return; }
   // Hosting platforms poll this to know the process is up and how busy it is.
-  if (path === '/healthz') { res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, rooms: parties.size })); return; }
+  // Cloud Run's frontend intercepts some paths ending in 'z', so /api/health is the public check.
+  if (path === '/healthz' || path === '/api/health') { res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, rooms: parties.size })); return; }
   if (path === '/') path = '/index.html';
   if (path === '/pad') path = '/pad.html';
   const file = resolve(DIST, `.${path}`);
@@ -152,10 +153,15 @@ const server = createServer((req, res) => {
   createReadStream(file).pipe(res);
 });
 
-// Browsers always send Origin: only pages served from this same host may open a party socket.
+// Browsers always send Origin: only pages served from this same host, or from an origin the host explicitly
+// allows, may open a party socket. Pages serves the client from another origin, so that origin is listed there.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean);
 const sameOrigin = (origin: string | undefined, host: string | undefined) => {
   if (!origin) return true;
-  try { return new URL(origin).host === host; } catch { return false; }
+  try {
+    const u = new URL(origin);
+    return u.host === host || ALLOWED_ORIGINS.includes(u.origin);
+  } catch { return false; }
 };
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1024, verifyClient: ({ origin, req }: { origin: string; req: { headers: { host?: string } } }) => sameOrigin(origin, req.headers.host) });
 // An oversized or malformed frame emits 'error'; without a listener Node would crash and end every room.

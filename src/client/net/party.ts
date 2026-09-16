@@ -4,6 +4,7 @@ import type { RaceState } from '../../shared/race.ts';
 import type { Series } from '../../shared/series.ts';
 import type { Track } from '../../shared/track.ts';
 import { createRemoteRunner, type RemoteRunner } from './remote.ts';
+import { padUrl, partySocketUrl } from '../../party-origin.ts';
 
 export interface SeatView { slot: number; name: string; connected: boolean; ready: boolean }
 /** Passed to Race and Results when the race runs on the party server. */
@@ -40,7 +41,7 @@ export class PartyLink {
   }
 
   private connect() {
-    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+    const ws = new WebSocket(partySocketUrl());
     this.ws = ws;
     ws.onopen = () => { this.error = ''; this.send(this.code ? { t: 'host', code: this.code, key: this.key } : { t: 'host' }); };
     ws.onmessage = (e) => { try { this.onMessage(JSON.parse(e.data)); } catch (err) { console.error(err); } };
@@ -68,9 +69,9 @@ export class PartyLink {
         this.key = m.key;
         this.trackNames = m.tracks;
         history.replaceState(null, '', `#host=${m.code}.${m.key}`);
-        // Phones must reach this host: use the LAN address when the TV page itself was opened on localhost.
+        // Phones must reach this page: use the server's LAN address when the TV page itself was opened on localhost.
         const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-        this.joinUrl = `${location.protocol}//${local ? m.lan : location.hostname}${location.port ? `:${location.port}` : ''}/pad.html?room=${m.code}`;
+        this.joinUrl = padUrl(m.code, local ? `${m.lan}${location.port ? `:${location.port}` : ''}` : location.host);
         QRCode.toDataURL(this.joinUrl, { margin: 1, scale: 8 }).then((url) => { this.qr = url; this.emit('party-changed'); });
         this.emit('party-changed');
         return;
