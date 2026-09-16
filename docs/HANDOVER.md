@@ -1,3 +1,29 @@
+# Handover — 2026-09-16 (gameplay before network)
+
+The user paused the network refactor: "i want us to get good gameplay before we do network". Do not start the
+Fuse Riders–style WebRTC work until they say so.
+
+## Done
+- Live party mode verified at protocol level: from the Pages origin, `wss` to Cloud Run creates a room, a phone
+  join gets a seat and the host sees it; `pad.html` on Pages loads and reports "no such room" for a bad code.
+- Trucks top out at 200 u/s (was 320); laps 17-26 s. Turn rate at top speed 180 deg/s, tyres +18 deg/s per level.
+- Trucks are one strict top-down sprite (`assets/raw/trucks-rotate/`) rotated continuously, squashed by `TILT`
+  and stacked on darker copies so the sides show (user asked for "a bit from the side", ADR 001 amended).
+
+## Reference game
+https://www.retrogames.cz/play_742-DOS.php runs Ironman Offroad Racing (DOS) in js-dos. Decline cookies via
+Manage options → Confirm choices; keys need synthetic `KeyboardEvent`s dispatched on the canvas. Video card 4,
+joystick N, sound 1, then Space through the intro; the attract demo shows a race. Measured on Sidewinder: the
+race clock runs at real time, the leader crosses the 320 px screen in about 3.3 s (~96 px/s) and laps take
+about 11 s, so by screen crossings the old 320 u/s speed matched it; "too slow"/"too fast" is the user's call.
+Camera looks down from the south at an angle, walls are raised, trucks are ~7 % of the screen width.
+The user suggested downloading and reverse engineering the game; declined (untrusted download, copyrighted).
+
+## Next
+The user plays and judges speed and the tilted trucks. Change feel one step at a time.
+
+---
+
 # Handover — 2026-09-16 (server deployed; refactor next)
 
 ## Done
